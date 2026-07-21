@@ -10,7 +10,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
-    "electron": "^latest",
+    "electron": "^31.0.0",
     "crypto-js": "^4.1.0",
     "better-sqlite3": "^8.5.0",
     "bcryptjs": "^2.4.3",
