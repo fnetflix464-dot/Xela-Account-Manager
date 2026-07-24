@@ -296,6 +296,105 @@ describe('category / folder / entry CRUD', () => {
   });
 });
 
+describe('listRecentEntries', () => {
+  test('returns entries newest-updated-first, capped at the given limit', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    const category = svc.addCategory('Personal', 'category');
+    const folder = svc.addFolder(category.id, null, 'General');
+    const a = svc.addEntry(category.id, folder.id, { title: 'A', template: 'Custom' });
+    svc.addEntry(category.id, folder.id, { title: 'B', template: 'Custom' });
+    const c = svc.addEntry(category.id, folder.id, { title: 'C', template: 'Custom' });
+
+    // Touch A again so it becomes the most recently updated, even though
+    // it was created first.
+    svc.updateEntryFields(a.id, { title: 'A' });
+
+    const recent = svc.listRecentEntries(2);
+    expect(recent).toHaveLength(2);
+    expect(recent[0].id).toBe(a.id);
+    expect(recent[1].id).toBe(c.id);
+  });
+});
+
+describe('findReusedPasswords', () => {
+  test('groups entries that share the same password field value', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    const category = svc.addCategory('Personal', 'category');
+    const folder = svc.addFolder(category.id, null, 'General');
+    let entryA = svc.addEntry(category.id, folder.id, { title: 'Site A', template: 'Login' });
+    let entryB = svc.addEntry(category.id, folder.id, { title: 'Site B', template: 'Login' });
+    svc.addEntry(category.id, folder.id, { title: 'Site C', template: 'Login' }); // stays unique, no password set
+
+    const setPassword = (entry, value) =>
+      svc.updateEntryFields(entry.id, {
+        fields: entry.fields.map((f) => (f.type === 'password' ? { ...f, value } : f)),
+      });
+    entryA = setPassword(entryA, 'shared-secret');
+    entryB = setPassword(entryB, 'shared-secret');
+
+    const groups = svc.findReusedPasswords();
+    expect(groups).toHaveLength(1);
+    expect(groups[0].map((e) => e.id).sort()).toEqual([entryA.id, entryB.id].sort());
+  });
+
+  test('returns no groups when no password is reused', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    const category = svc.addCategory('Personal', 'category');
+    const folder = svc.addFolder(category.id, null, 'General');
+    svc.addEntry(category.id, folder.id, { title: 'Site A', template: 'Login' });
+    svc.addEntry(category.id, folder.id, { title: 'Site B', template: 'Login' });
+
+    expect(svc.findReusedPasswords()).toEqual([]);
+  });
+});
+
+describe('backup management', () => {
+  test('deleteBackup removes it from listBackups', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    svc.addCategory('Personal', 'category'); // triggers a backup
+    const [backupPath] = svc.listBackups();
+
+    svc.deleteBackup(backupPath);
+    expect(svc.listBackups()).not.toContain(backupPath);
+  });
+
+  test('renameBackup enforces the vault- prefix so listBackups still finds it', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    svc.addCategory('Personal', 'category');
+    const [backupPath] = svc.listBackups();
+
+    const newPath = svc.renameBackup(backupPath, 'before cleanup');
+    expect(fs.existsSync(newPath)).toBe(true);
+    expect(fs.existsSync(backupPath)).toBe(false);
+    expect(svc.listBackups()).toContain(newPath);
+  });
+
+  test('renameBackup rejects an empty label', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    svc.addCategory('Personal', 'category');
+    const [backupPath] = svc.listBackups();
+
+    expect(() => svc.renameBackup(backupPath, '   ')).toThrow(/empty/i);
+  });
+
+  test('exportBackupTo copies the backup file to the destination', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    svc.addCategory('Personal', 'category');
+    const [backupPath] = svc.listBackups();
+
+    const destPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'xela-export-')), 'exported.bak');
+    svc.exportBackupTo(backupPath, destPath);
+    expect(fs.readFileSync(destPath, 'utf8')).toBe(fs.readFileSync(backupPath, 'utf8'));
+  });
+});
+
 describe('recycle bin', () => {
   test('deleting an entry/folder/category moves it to the recycle bin, and restore brings it back', () => {
     const svc = createTestService();

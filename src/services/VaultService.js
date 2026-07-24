@@ -494,9 +494,56 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     return favorites;
   }
 
+  /**
+   * The `limit` most recently created/edited entries, newest first. Uses
+   * `updatedAt` (touched on every field/title/favorite change) rather than
+   * the activity log, so it reflects actual entry state rather than
+   * requiring activity records to still exist and be resolved back to a
+   * live entry.
+   */
+  function listRecentEntries(limit = 10) {
+    requireUnlocked();
+    const all = [];
+    for (const category of vault.categories) {
+      const walk = (folder) => {
+        all.push(...folder.entries);
+        folder.folders.forEach(walk);
+      };
+      category.folders.forEach(walk);
+    }
+    return all.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0, limit);
+  }
+
   function listRecentActivity(limit = 20) {
     requireUnlocked();
     return ActivityLogService.list(vault, limit);
+  }
+
+  /**
+   * Groups entries that share the same password field value - a reused
+   * password is a real security risk (one leak compromises every entry
+   * using it). Returns only enough to locate each entry in the UI
+   * (id/title/categoryName/folderPath), never the shared password value
+   * itself - the report should say "these 3 entries share a password",
+   * not repeat the password back.
+   */
+  function findReusedPasswords() {
+    requireUnlocked();
+    const byPassword = new Map();
+    for (const category of vault.categories) {
+      const walk = (folder, folderPath) => {
+        for (const entry of folder.entries) {
+          const passwordField = entry.fields.find((f) => f.type === 'password' && f.value);
+          if (!passwordField) continue;
+          const group = byPassword.get(passwordField.value) || [];
+          group.push({ id: entry.id, title: entry.title, categoryName: category.name, folderPath });
+          byPassword.set(passwordField.value, group);
+        }
+        folder.folders.forEach((sub) => walk(sub, `${folderPath}/${sub.name}`));
+      };
+      category.folders.forEach((f) => walk(f, f.name));
+    }
+    return [...byPassword.values()].filter((group) => group.length > 1);
   }
 
   /**
@@ -626,6 +673,21 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     if (isUnlocked()) lock();
   }
 
+  // Backup-file management is deliberately independent of vault lock
+  // state, same reasoning as restoreBackup above - a backup file is
+  // filesystem housekeeping, not vault content.
+  function deleteBackup(backupPath) {
+    VaultRepository.deleteBackup(backupPath);
+  }
+
+  function renameBackup(backupPath, newLabel) {
+    return VaultRepository.renameBackup(backupPath, newLabel, backupDir);
+  }
+
+  function exportBackupTo(backupPath, destPath) {
+    VaultRepository.exportBackupTo(backupPath, destPath);
+  }
+
   // ---- search ------------------------------------------------------------
 
   function search(query) {
@@ -657,7 +719,9 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     duplicateEntryById,
     toggleFavorite,
     listFavorites,
+    listRecentEntries,
     listRecentActivity,
+    findReusedPasswords,
     recordError,
     restoreFromRecycleBin,
     permanentlyDelete,
@@ -668,6 +732,9 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     importVaultFrom,
     listBackups,
     restoreBackup,
+    deleteBackup,
+    renameBackup,
+    exportBackupTo,
     search,
   };
 }

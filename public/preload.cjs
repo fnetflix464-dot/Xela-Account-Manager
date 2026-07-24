@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('electron', {
   toggleFavorite: (entryId) => ipcRenderer.invoke('toggle-favorite', entryId),
   listFavorites: () => ipcRenderer.invoke('list-favorites'),
   listRecentActivity: (limit) => ipcRenderer.invoke('list-recent-activity', limit),
+  listRecentEntries: (limit) => ipcRenderer.invoke('list-recent-entries', limit),
+  findReusedPasswords: () => ipcRenderer.invoke('find-reused-passwords'),
   recordError: (message, stack) => ipcRenderer.invoke('record-error', message, stack),
 
   // ---- recycle bin ----
@@ -74,6 +76,9 @@ contextBridge.exposeInMainWorld('electron', {
   // ---- backup / import / export ----
   listBackups: () => ipcRenderer.invoke('list-backups'),
   restoreBackup: (backupPath) => ipcRenderer.invoke('restore-backup', backupPath),
+  deleteBackup: (backupPath) => ipcRenderer.invoke('delete-backup', backupPath),
+  renameBackup: (backupPath, newLabel) => ipcRenderer.invoke('rename-backup', backupPath, newLabel),
+  exportBackup: (backupPath) => ipcRenderer.invoke('export-backup', backupPath),
   exportVault: () => ipcRenderer.invoke('export-vault'),
   importVault: (password) => ipcRenderer.invoke('import-vault', password),
 });

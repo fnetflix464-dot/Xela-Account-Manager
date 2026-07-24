@@ -10,6 +10,8 @@ function Settings({ onSettingsChanged }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [importPassword, setImportPassword] = useState('');
+  const [renamingPath, setRenamingPath] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const load = useCallback(async () => {
     const [settingsResult, backupsResult] = await Promise.all([
@@ -116,6 +118,40 @@ function Settings({ onSettingsChanged }) {
     } else {
       setError(result.error);
     }
+  };
+
+  const handleDeleteBackup = async (backupPath) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Delete this backup permanently? This cannot be undone.')) return;
+    const result = await window.electron.deleteBackup(backupPath);
+    if (result.success) {
+      setBackups((prev) => prev.filter((p) => p !== backupPath));
+    } else {
+      setError(result.error);
+    }
+  };
+
+  const handleStartRename = (backupPath) => {
+    setRenamingPath(backupPath);
+    setRenameValue('');
+    setError('');
+  };
+
+  const handleConfirmRename = async () => {
+    if (!renameValue.trim()) return;
+    const result = await window.electron.renameBackup(renamingPath, renameValue.trim());
+    if (result.success) {
+      setBackups((prev) => prev.map((p) => (p === renamingPath ? result.data : p)));
+      setRenamingPath(null);
+      setRenameValue('');
+    } else {
+      setError(result.error);
+    }
+  };
+
+  const handleExportBackup = async (backupPath) => {
+    const result = await window.electron.exportBackup(backupPath);
+    if (!result.success) setError(result.error);
   };
 
   if (!settings) {
@@ -251,16 +287,50 @@ function Settings({ onSettingsChanged }) {
           <p className="hint">No backups yet — one is made automatically every time the vault saves.</p>
         ) : (
           <ul>
-            {backups.slice(0, 5).map((path) => (
+            {backups.slice(0, 20).map((path) => (
               <li key={path}>
-                {path.split(/[\\/]/).pop()}{' '}
-                <button className="btn btn-sm btn-outline" onClick={() => handleRestoreBackup(path)}>
-                  Restore
-                </button>
+                {renamingPath === path ? (
+                  <>
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      placeholder="New name"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleConfirmRename();
+                        if (e.key === 'Escape') setRenamingPath(null);
+                      }}
+                    />{' '}
+                    <button className="btn btn-sm btn-primary" disabled={!renameValue.trim()} onClick={handleConfirmRename}>
+                      Save
+                    </button>{' '}
+                    <button className="btn btn-sm btn-outline" onClick={() => setRenamingPath(null)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {path.split(/[\\/]/).pop()}{' '}
+                    <button className="btn btn-sm btn-outline" onClick={() => handleRestoreBackup(path)}>
+                      Restore
+                    </button>{' '}
+                    <button className="btn btn-sm btn-outline" onClick={() => handleStartRename(path)}>
+                      Rename
+                    </button>{' '}
+                    <button className="btn btn-sm btn-outline" onClick={() => handleExportBackup(path)}>
+                      Export
+                    </button>{' '}
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteBackup(path)}>
+                      Delete
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
         )}
+        {backups.length > 20 && <p className="hint">Showing the 20 most recent of {backups.length} backups.</p>}
       </div>
 
       {saved && <div className="success-message">✅ Saved successfully</div>}

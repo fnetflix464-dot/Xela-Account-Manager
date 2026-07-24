@@ -60,3 +60,39 @@ export function restoreBackup(backupPath, vaultFilePath, backupDir, keepCount = 
   createBackup(vaultFilePath, backupDir, keepCount);
   FileService.copyFile(backupPath, vaultFilePath);
 }
+
+export function deleteBackup(backupPath) {
+  if (!FileService.pathExists(backupPath)) {
+    throw new Error('Backup file not found');
+  }
+  FileService.deleteFile(backupPath);
+}
+
+/**
+ * Renames a backup to a user-chosen label. The `vault-` prefix is always
+ * enforced (not just cosmetic - listBackups() only discovers files that
+ * start with it) and the label is sanitized to characters safe across
+ * filesystems.
+ */
+export function renameBackup(backupPath, newLabel, backupDir) {
+  if (!FileService.pathExists(backupPath)) {
+    throw new Error('Backup file not found');
+  }
+  const sanitized = String(newLabel).trim().replace(/[<>:"/\\|?*\x00-\x1f]/g, '').slice(0, 80);
+  if (!sanitized) {
+    throw new Error('Backup name cannot be empty');
+  }
+  const newPath = path.join(backupDir, `${BACKUP_PREFIX}${sanitized}${BACKUP_SUFFIX}`);
+  if (newPath !== backupPath && FileService.pathExists(newPath)) {
+    throw new Error('A backup with that name already exists');
+  }
+  FileService.renameFile(backupPath, newPath);
+  return newPath;
+}
+
+export function exportBackupTo(backupPath, destPath) {
+  if (!FileService.pathExists(backupPath)) {
+    throw new Error('Backup file not found');
+  }
+  FileService.copyFile(backupPath, destPath);
+}

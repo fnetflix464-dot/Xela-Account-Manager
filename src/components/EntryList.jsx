@@ -2,12 +2,20 @@ import React, { useState } from 'react';
 import '../styles/AccountList.css';
 import { entryTemplates } from '../data/entryTemplates.js';
 import { copyWithAutoClear } from '../utils/clipboard';
+import { splitByMatch } from '../utils/highlightMatch';
 
 const TEMPLATE_EMOJI = Object.fromEntries(entryTemplates.map((t) => [t.name, t.emoji]));
 const FOLDER_EMOJI = '📁';
 
 function countEntriesRecursive(folder) {
   return folder.entries.length + folder.folders.reduce((sum, f) => sum + countEntriesRecursive(f), 0);
+}
+
+function HighlightedText({ text, query }) {
+  return splitByMatch(text, query).map((segment, i) =>
+    // eslint-disable-next-line react/no-array-index-key
+    segment.matched ? <mark key={i}>{segment.text}</mark> : <React.Fragment key={i}>{segment.text}</React.Fragment>,
+  );
 }
 
 function EntryList({
@@ -21,6 +29,7 @@ function EntryList({
   onDuplicate,
   onToggleFavorite,
   clipboardClearSeconds,
+  hideSearch,
 }) {
   const [revealedFields, setRevealedFields] = useState({});
 
@@ -36,13 +45,15 @@ function EntryList({
   return (
     <div className="account-list-container">
       <div className="list-header">
-        <input
-          type="text"
-          placeholder="🔍 Search this vault..."
-          value={searchTerm}
-          onChange={(e) => onSearchTermChange(e.target.value)}
-          className="search-input"
-        />
+        {!hideSearch && (
+          <input
+            type="text"
+            placeholder="🔍 Search this vault..."
+            value={searchTerm}
+            onChange={(e) => onSearchTermChange(e.target.value)}
+            className="search-input"
+          />
+        )}
         <span className="account-count">{entries.length} items</span>
       </div>
 
@@ -70,7 +81,9 @@ function EntryList({
               <div className="card-header">
                 <div className="card-title">
                   <span className="category-icon">{TEMPLATE_EMOJI[entry.template] || '📄'}</span>
-                  <h4>{entry.title}</h4>
+                  <h4>
+                    <HighlightedText text={entry.title} query={searchTerm} />
+                  </h4>
                 </div>
                 <span className="category-badge">{entry.template}</span>
               </div>

@@ -236,7 +236,9 @@ handle('duplicate-entry', (entryId) =>
 );
 handle('toggle-favorite', (entryId) => withUndo('Toggle favorite', () => vaultService.toggleFavorite(entryId)));
 handle('list-favorites', () => vaultService.listFavorites());
+handle('list-recent-entries', (limit) => vaultService.listRecentEntries(limit));
 handle('list-recent-activity', (limit) => vaultService.listRecentActivity(limit));
+handle('find-reused-passwords', () => vaultService.findReusedPasswords());
 handle('record-error', (message, stack) => {
   vaultService.recordError(message, stack);
   return true;
@@ -275,6 +277,24 @@ handle('list-backups', () => vaultService.listBackups());
 handle('restore-backup', (backupPath) => {
   vaultService.restoreBackup(backupPath);
   return true;
+});
+
+handle('delete-backup', (backupPath) => {
+  vaultService.deleteBackup(backupPath);
+  return true;
+});
+
+handle('rename-backup', (backupPath, newLabel) => vaultService.renameBackup(backupPath, newLabel));
+
+handle('export-backup', async (backupPath) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export Backup',
+    defaultPath: path.basename(backupPath),
+    filters: [{ name: 'Xela Vault Backup', extensions: ['bak'] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  vaultService.exportBackupTo(backupPath, result.filePath);
+  return result.filePath;
 });
 
 handle('export-vault', async () => {

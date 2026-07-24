@@ -119,6 +119,7 @@ function App() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [recentEntries, setRecentEntries] = useState([]);
 
   const clearError = () => setError('');
 
@@ -164,12 +165,18 @@ function App() {
     if (result.success) setSettings(result.data);
   }, []);
 
+  const loadRecentEntries = useCallback(async () => {
+    const result = await window.electron.listRecentEntries(10);
+    if (result.success) setRecentEntries(result.data);
+  }, []);
+
   const { canUndo, canRedo, undo, redo } = useUndoRedo({ enabled: isAuthenticated, onChanged: loadTree });
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
     loadTree();
     loadSettings();
+    loadRecentEntries();
 
     const unsubscribe = window.electron.onVaultEvent((event) => {
       if (event.action === 'vault.locked') {
@@ -315,6 +322,7 @@ function App() {
     setShowNewEntryModal(false);
     if (result.success) {
       await loadTree();
+      loadRecentEntries();
       setEditingEntry(result.data);
     } else {
       setError(result.error);
@@ -328,6 +336,7 @@ function App() {
     if (result.success) {
       setEditingEntry(null);
       loadTree();
+      loadRecentEntries();
     } else {
       setError(result.error);
     }
@@ -337,20 +346,26 @@ function App() {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Delete this entry? It will move to the Recycle Bin.')) return;
     const result = await window.electron.deleteEntry(entryId);
-    if (result.success) loadTree();
-    else setError(result.error);
+    if (result.success) {
+      loadTree();
+      loadRecentEntries();
+    } else setError(result.error);
   };
 
   const handleDuplicateEntry = async (entryId) => {
     const result = await window.electron.duplicateEntry(entryId);
-    if (result.success) loadTree();
-    else setError(result.error);
+    if (result.success) {
+      loadTree();
+      loadRecentEntries();
+    } else setError(result.error);
   };
 
   const handleToggleFavorite = async (entryId) => {
     const result = await window.electron.toggleFavorite(entryId);
-    if (result.success) loadTree();
-    else setError(result.error);
+    if (result.success) {
+      loadTree();
+      loadRecentEntries();
+    } else setError(result.error);
   };
 
   // ---- derived state ----
@@ -388,6 +403,12 @@ function App() {
           </button>
           <button className="nav-tab" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
             ↪️ Redo
+          </button>
+          <button
+            className={`nav-tab ${activeTab === 'recent' ? 'active' : ''}`}
+            onClick={() => setActiveTab('recent')}
+          >
+            🕐 Recent
           </button>
           <button
             className={`nav-tab ${activeTab === 'recycle' ? 'active' : ''}`}
@@ -479,6 +500,38 @@ function App() {
             )}
           </main>
         </div>
+      )}
+
+      {activeTab === 'recent' && (
+        <main className="main-panel">
+          <div className="panel-header">
+            <div className="panel-header-title">
+              <h2>Recently Updated</h2>
+            </div>
+          </div>
+          {editingEntry ? (
+            <EntryForm
+              entry={editingEntry}
+              passwordGeneratorSettings={settings ? settings.passwordGenerator : {}}
+              onSubmit={handleSaveEntry}
+              onCancel={() => setEditingEntry(null)}
+            />
+          ) : (
+            <EntryList
+              entries={recentEntries}
+              subfolders={[]}
+              onOpenFolder={() => {}}
+              searchTerm=""
+              onSearchTermChange={() => {}}
+              hideSearch
+              onEdit={setEditingEntry}
+              onDelete={handleDeleteEntry}
+              onDuplicate={handleDuplicateEntry}
+              onToggleFavorite={handleToggleFavorite}
+              clipboardClearSeconds={settings ? settings.clipboardClearSeconds : 20}
+            />
+          )}
+        </main>
       )}
 
       {activeTab === 'recycle' && (

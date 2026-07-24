@@ -142,3 +142,7 @@ export function deleteFile(filePath) {
     fs.unlinkSync(filePath);
   }
 }
+
+export function renameFile(oldPath, newPath) {
+  fs.renameSync(oldPath, newPath);
+}

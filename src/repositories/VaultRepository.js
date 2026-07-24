@@ -116,3 +116,15 @@ export function listBackups(backupDir) {
 export function restoreBackup(backupPath, vaultFilePath, backupDir, keepCount) {
   BackupService.restoreBackup(backupPath, vaultFilePath, backupDir, keepCount);
 }
+
+export function deleteBackup(backupPath) {
+  BackupService.deleteBackup(backupPath);
+}
+
+export function renameBackup(backupPath, newLabel, backupDir) {
+  return BackupService.renameBackup(backupPath, newLabel, backupDir);
+}
+
+export function exportBackupTo(backupPath, destPath) {
+  BackupService.exportBackupTo(backupPath, destPath);
+}
