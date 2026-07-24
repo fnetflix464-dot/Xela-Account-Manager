@@ -138,6 +138,21 @@
 .tree-node {
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* Discord-style connector: a continuous vertical guide down the left
+   edge of a children group, with a short horizontal tick reaching from
+   that guide to each child row - applies at every nesting level
+   (category -> folder, folder -> subfolder, ...) since indentation now
+   comes purely from this nesting rather than a computed padding value. */
+.tree-children > .tree-node::before {
+  content: '';
+  position: absolute;
+  top: 1.05rem;
+  left: -0.75rem;
+  width: 0.65rem;
+  border-top: 1px solid var(--color-border);
 }
 
 .tree-toggle {
@@ -167,5 +182,8 @@
 .tree-children {
   display: flex;
   flex-direction: column;
+  margin-left: 0.9rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--color-border);
 }
 

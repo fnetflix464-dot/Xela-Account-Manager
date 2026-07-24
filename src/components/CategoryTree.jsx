@@ -40,7 +40,6 @@ function findFolderContext(categories, categoryId, folderId) {
 function FolderNode({
   folder,
   categoryId,
-  depth,
   selectedFolderId,
   onSelectFolder,
   onContextMenu,
@@ -60,7 +59,6 @@ function FolderNode({
         className={`category-item ${selectedFolderId === folder.id ? 'active' : ''} ${
           isDragging ? 'dragging' : ''
         } ${dragOverId === folder.id ? 'drag-over' : ''}`}
-        style={{ paddingLeft: `${1 + depth * 1.25}rem` }}
         draggable
         onClick={() => onSelectFolder(categoryId, folder.id)}
         onDoubleClick={() => hasChildren && setExpanded((v) => !v)}
@@ -107,7 +105,6 @@ function FolderNode({
               key={child.id}
               folder={child}
               categoryId={categoryId}
-              depth={depth + 1}
               selectedFolderId={selectedFolderId}
               onSelectFolder={onSelectFolder}
               onContextMenu={onContextMenu}
@@ -179,7 +176,6 @@ function CategoryNode({
               key={folder.id}
               folder={folder}
               categoryId={category.id}
-              depth={1}
               selectedFolderId={selectedFolderId}
               onSelectFolder={onSelectFolder}
               onContextMenu={onContextMenu}
