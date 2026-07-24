@@ -267,7 +267,7 @@ function Login({ onLoginSuccess }) {
       <div className="login-container">
         <div className="login-box">
           <div className="login-header">
-            <h1>🔐 Xela Account Manager</h1>
+            <h1>Xela Account Manager</h1>
             <p>Import an Existing Vault</p>
           </div>
 
@@ -289,7 +289,7 @@ function Login({ onLoginSuccess }) {
             {error && <div className="error-message">{error}</div>}
 
             <button type="submit" className="btn btn-primary btn-large" disabled={loading}>
-              {loading ? 'Processing...' : '📂 Choose File & Import'}
+              {loading ? 'Processing...' : 'Choose File & Import'}
             </button>
           </form>
 
@@ -321,7 +321,7 @@ function Login({ onLoginSuccess }) {
     <div className="login-container">
       <div className="login-box">
         <div className="login-header">
-          <h1>🔐 Xela Account Manager</h1>
+          <h1>Xela Account Manager</h1>
           <p>{mode === 'setup' ? 'Set Your Master Password' : 'Unlock Your Accounts'}</p>
         </div>
 
@@ -373,7 +373,7 @@ function Login({ onLoginSuccess }) {
           {mode === 'setup' && (
             <div className="security-info">
               <p>
-                ⚠️ <strong>Important:</strong> Your master password cannot be recovered. Store it securely.
+                <strong>Important:</strong> Your master password cannot be recovered. Store it securely.
               </p>
             </div>
           )}
@@ -388,8 +388,8 @@ function Login({ onLoginSuccess }) {
         <div className="login-footer">
           <p>
             {mode === 'setup'
-              ? '🔒 This is your one-time setup. Create a strong password to protect your accounts.'
-              : '🔑 Enter your master password to access your accounts.'}
+              ? 'This is your one-time setup. Create a strong password to protect your accounts.'
+              : 'Enter your master password to access your accounts.'}
           </p>
           <button
             type="button"
@@ -400,7 +400,7 @@ function Login({ onLoginSuccess }) {
               setMode('import');
             }}
           >
-            {mode === 'setup' ? '📂 Import an existing vault instead' : '📂 Import a different vault'}
+            {mode === 'setup' ? 'Import an existing vault instead' : 'Import a different vault'}
           </button>
           {mode === 'verify' && (
             <button

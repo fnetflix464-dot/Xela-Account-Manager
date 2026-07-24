@@ -61,7 +61,7 @@ function RecycleBin({ onChanged }) {
   return (
     <div className="security-dashboard">
       <div className="panel-header">
-        <h2>🗑️ Recycle Bin</h2>
+        <h2>Recycle Bin</h2>
         {items.length > 0 && (
           <button className="btn btn-danger" onClick={emptyBin}>
             Empty Recycle Bin
@@ -73,7 +73,7 @@ function RecycleBin({ onChanged }) {
 
       {items.length === 0 ? (
         <div className="empty-state">
-          <p>🗑️ Recycle Bin is empty</p>
+          <p>Recycle Bin is empty</p>
         </div>
       ) : (
         <div className="audit-log">
@@ -85,10 +85,10 @@ function RecycleBin({ onChanged }) {
               </div>
               <div className="card-actions">
                 <button className="btn btn-sm btn-success" onClick={() => restore(record.id)}>
-                  ♻️ Restore
+                  Restore
                 </button>
                 <button className="btn btn-sm btn-danger" onClick={() => permanentlyDelete(record.id)}>
-                  ✕ Delete Forever
+                  Delete Forever
                 </button>
               </div>
             </div>

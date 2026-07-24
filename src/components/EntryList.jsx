@@ -1,11 +1,7 @@
 import React, { useState } from 'react';
 import '../styles/AccountList.css';
-import { entryTemplates } from '../data/entryTemplates.js';
 import { copyWithAutoClear } from '../utils/clipboard';
 import { splitByMatch } from '../utils/highlightMatch';
-
-const TEMPLATE_EMOJI = Object.fromEntries(entryTemplates.map((t) => [t.name, t.emoji]));
-const FOLDER_EMOJI = '📁';
 
 function countEntriesRecursive(folder) {
   return folder.entries.length + folder.folders.reduce((sum, f) => sum + countEntriesRecursive(f), 0);
@@ -56,7 +52,7 @@ function EntryList({
         {!hideSearch && (
           <input
             type="text"
-            placeholder="🔍 Search this vault..."
+            placeholder="Search this vault..."
             value={searchTerm}
             onChange={(e) => onSearchTermChange(e.target.value)}
             className="search-input"
@@ -83,7 +79,6 @@ function EntryList({
         <div className="folders-grid">
           {subfolders.map((folder) => (
             <button key={folder.id} className="folder-tile" onClick={() => onOpenFolder(folder.id)}>
-              <span className="folder-tile-emoji">{FOLDER_EMOJI}</span>
               <span className="folder-tile-name">{folder.name}</span>
               <span className="folder-tile-count">{countEntriesRecursive(folder)}</span>
             </button>
@@ -93,7 +88,7 @@ function EntryList({
 
       {entries.length === 0 && subfolders.length === 0 ? (
         <div className="empty-state">
-          <p>📭 No entries here</p>
+          <p>No entries here</p>
           <p className="hint">Add your first entry to get started</p>
         </div>
       ) : visibleEntries.length === 0 ? (
@@ -108,7 +103,6 @@ function EntryList({
             <div key={entry.id} className="account-card">
               <div className="card-header">
                 <div className="card-title">
-                  <span className="category-icon">{TEMPLATE_EMOJI[entry.template] || '📄'}</span>
                   <h4>
                     <HighlightedText text={entry.title} query={searchTerm} />
                   </h4>
@@ -131,14 +125,14 @@ function EntryList({
                             onClick={() => toggleReveal(entry.id, field.id)}
                             title={revealed ? 'Hide' : 'Show'}
                           >
-                            {revealed ? '👁️' : '👁️‍🗨️'}
+                            {revealed ? 'Hide' : 'Show'}
                           </button>
                           <button
                             className="btn-copy"
                             onClick={() => copyToClipboard(field.value)}
                             title={`Copy ${field.label}`}
                           >
-                            📋
+                            Copy
                           </button>
                         </div>
                       ) : (
@@ -158,20 +152,20 @@ function EntryList({
 
               <div className="card-actions">
                 <button
-                  className={`btn btn-sm ${entry.favorite ? 'btn-success' : 'btn-outline'}`}
+                  className={`btn-card-action ${entry.favorite ? 'active' : ''}`}
                   onClick={() => onToggleFavorite(entry.id)}
                   title={entry.favorite ? 'Unfavorite' : 'Favorite'}
                 >
-                  {entry.favorite ? '⭐ Favorited' : '☆ Favorite'}
+                  {entry.favorite ? 'Favorited' : 'Favorite'}
                 </button>
-                <button className="btn btn-sm btn-outline" onClick={() => onDuplicate(entry.id)}>
-                  📑 Duplicate
+                <button className="btn-card-action" onClick={() => onDuplicate(entry.id)}>
+                  Duplicate
                 </button>
-                <button className="btn btn-sm btn-primary" onClick={() => onEdit(entry)}>
-                  ✏️ Edit
+                <button className="btn-card-action" onClick={() => onEdit(entry)}>
+                  Edit
                 </button>
-                <button className="btn btn-sm btn-danger" onClick={() => onDelete(entry.id)}>
-                  🗑️ Delete
+                <button className="btn-card-action danger" onClick={() => onDelete(entry.id)}>
+                  Delete
                 </button>
               </div>
             </div>

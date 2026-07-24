@@ -7,6 +7,7 @@ import EntryForm from './components/EntryForm';
 import RecycleBin from './components/RecycleBin';
 import ActivityLog from './components/ActivityLog';
 import Settings from './components/Settings';
+import ContextMenu from './components/ContextMenu';
 import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { applyTheme } from './utils/theme';
@@ -121,6 +122,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recentEntries, setRecentEntries] = useState([]);
+  const [moreMenu, setMoreMenu] = useState(null); // { x, y } | null
 
   const clearError = () => setError('');
 
@@ -171,7 +173,9 @@ function App() {
     if (result.success) setRecentEntries(result.data);
   }, []);
 
-  const { canUndo, canRedo, undo, redo } = useUndoRedo({ enabled: isAuthenticated, onChanged: loadTree });
+  // Undo/redo has no visible header button (minimalist layout) - the
+  // hook still wires Ctrl+Z / Ctrl+Shift+Z globally on its own.
+  useUndoRedo({ enabled: isAuthenticated, onChanged: loadTree });
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
@@ -426,45 +430,47 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>🔐 Xela Account Manager</h1>
+        <div className="app-header-top">
+          <h1>Xela Account Manager</h1>
+          <div className="header-actions">
+            <button
+              className={`btn-icon ${['recycle', 'activity', 'settings'].includes(activeTab) ? 'active' : ''}`}
+              title="More"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMoreMenu({ x: rect.left, y: rect.bottom + 4 });
+              }}
+            >
+              ⋮
+            </button>
+            <button className="btn-lock" onClick={handleLock}>
+              Lock
+            </button>
+          </div>
+        </div>
         <nav className="nav-tabs">
           <button className={`nav-tab ${activeTab === 'vault' ? 'active' : ''}`} onClick={() => setActiveTab('vault')}>
-            📋 Vault
-          </button>
-          <button className="nav-tab" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
-            ↩️ Undo
-          </button>
-          <button className="nav-tab" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
-            ↪️ Redo
+            Vault
           </button>
           <button
             className={`nav-tab ${activeTab === 'recent' ? 'active' : ''}`}
             onClick={() => setActiveTab('recent')}
           >
-            🕐 Recent
-          </button>
-          <button
-            className={`nav-tab ${activeTab === 'recycle' ? 'active' : ''}`}
-            onClick={() => setActiveTab('recycle')}
-          >
-            🗑️ Recycle Bin
-          </button>
-          <button
-            className={`nav-tab ${activeTab === 'activity' ? 'active' : ''}`}
-            onClick={() => setActiveTab('activity')}
-          >
-            🛡️ Activity
-          </button>
-          <button
-            className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            ⚙️ Settings
-          </button>
-          <button className="nav-tab" onClick={handleLock}>
-            🔒 Lock Vault
+            Recent
           </button>
         </nav>
+        {moreMenu && (
+          <ContextMenu
+            x={moreMenu.x}
+            y={moreMenu.y}
+            items={[
+              { label: 'Recycle Bin', onClick: () => setActiveTab('recycle') },
+              { label: 'Activity', onClick: () => setActiveTab('activity') },
+              { label: 'Settings', onClick: () => setActiveTab('settings') },
+            ]}
+            onClose={() => setMoreMenu(null)}
+          />
+        )}
       </header>
 
       {error && (
@@ -508,7 +514,7 @@ function App() {
                 title={!selectedFolderId ? 'Select or create a folder first - entries live inside folders' : undefined}
                 onClick={() => setShowNewEntryModal(true)}
               >
-                ➕ New Entry
+                New Entry
               </button>
             </div>
 

@@ -37,7 +37,7 @@ function PasswordHistoryList({ history }) {
                 onClick={() => toggleReveal(index)}
                 title={revealedIndexes[index] ? 'Hide' : 'Show'}
               >
-                {revealedIndexes[index] ? '👁️' : '👁️‍🗨️'}
+                {revealedIndexes[index] ? 'Hide' : 'Show'}
               </button>
               <span className="password-history-date">
                 {entry.changedAt ? new Date(entry.changedAt).toLocaleString() : ''}
@@ -231,7 +231,7 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
         })}
 
         <button type="button" className="btn btn-outline btn-add-field" onClick={() => setShowAddFieldModal(true)}>
-          ➕ Add Field
+          Add Field
         </button>
 
         <div className="form-actions">

@@ -40,7 +40,7 @@ class ErrorBoundary extends React.Component {
       return (
         <div style={styles.container}>
           <div style={styles.content}>
-            <h2 style={styles.title}>⚠️ Oops! Something went wrong</h2>
+            <h2 style={styles.title}>Something went wrong</h2>
             <details style={styles.details}>
               <summary>Error Details</summary>
               <pre style={styles.errorText}>
@@ -50,7 +50,7 @@ class ErrorBoundary extends React.Component {
               </pre>
             </details>
             <button onClick={this.handleReset} style={styles.button}>
-              🔄 Try Again
+              Try Again
             </button>
           </div>
         </div>

@@ -160,7 +160,7 @@ function Settings({ onSettingsChanged }) {
 
   return (
     <div className="settings-container">
-      <h2>⚙️ Settings</h2>
+      <h2>Settings</h2>
 
       {error && <div className="error-message">{error}</div>}
 
@@ -169,9 +169,9 @@ function Settings({ onSettingsChanged }) {
         <div className="setting-item">
           <label>Theme</label>
           <select value={settings.theme} onChange={(e) => handleThemeChange(e.target.value)}>
-            <option value="light">☀️ Light</option>
-            <option value="dark">🌙 Dark</option>
-            <option value="system">🖥️ System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="system">System</option>
           </select>
         </div>
       </div>
@@ -333,11 +333,11 @@ function Settings({ onSettingsChanged }) {
         {backups.length > 20 && <p className="hint">Showing the 20 most recent of {backups.length} backups.</p>}
       </div>
 
-      {saved && <div className="success-message">✅ Saved successfully</div>}
+      {saved && <div className="success-message">Saved successfully</div>}
 
       <div className="settings-actions">
         <button className="btn btn-primary" onClick={handleSave}>
-          💾 Save Settings
+          Save Settings
         </button>
       </div>
 
@@ -370,7 +370,7 @@ function Settings({ onSettingsChanged }) {
       <div className="settings-section">
         <h3>Data Management</h3>
         <button className="btn btn-secondary" onClick={handleExport}>
-          📥 Export Vault (.xam)
+          Export Vault (.xam)
         </button>
         <p className="hint">Saves an encrypted copy of your vault - still requires your master password to open.</p>
 
@@ -379,7 +379,7 @@ function Settings({ onSettingsChanged }) {
           <input type="password" value={importPassword} onChange={(e) => setImportPassword(e.target.value)} />
         </div>
         <button className="btn btn-secondary" onClick={handleImport}>
-          📤 Import Vault (.xam)
+          Import Vault (.xam)
         </button>
       </div>
     </div>

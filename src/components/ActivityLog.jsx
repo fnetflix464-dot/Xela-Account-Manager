@@ -52,7 +52,7 @@ function ActivityLog() {
   return (
     <div className="security-dashboard">
       <div className="dashboard-header">
-        <h2>🛡️ Activity</h2>
+        <h2>Activity</h2>
       </div>
 
       {error && <div className="error-message">{error}</div>}

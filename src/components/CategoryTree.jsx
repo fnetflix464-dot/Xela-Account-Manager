@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import '../styles/CategoryFilter.css';
 import ContextMenu from './ContextMenu';
 
-const FOLDER_EMOJI = '📁';
-const CATEGORY_EMOJI = '🗂️';
-
 function countEntries(folder) {
   return folder.entries.length + folder.folders.reduce((sum, f) => sum + countEntries(f), 0);
 }
@@ -78,7 +75,6 @@ function FolderNode({
         >
           {hasChildren ? (expanded ? '▾' : '▸') : '▸'}
         </span>
-        <span className="emoji">{FOLDER_EMOJI}</span>
         <span className="name">{folder.name}</span>
         <span className="count">{countEntries(folder)}</span>
       </button>
@@ -151,7 +147,6 @@ function CategoryNode({
         >
           {hasChildren ? (expanded ? '▾' : '▸') : '▸'}
         </span>
-        <span className="emoji">{CATEGORY_EMOJI}</span>
         <span className="name">{category.name}</span>
         <span className="count">{category.folders.reduce((sum, f) => sum + countEntries(f), 0)}</span>
       </button>
@@ -214,30 +209,28 @@ function CategoryTree({
     event.preventDefault();
     const items = folder
       ? [
-          { label: 'New Subfolder', icon: '➕', onClick: () => onAddFolder(categoryId, folder.id) },
-          { label: 'Rename Folder', icon: '✏️', onClick: () => onRenameFolder(categoryId, folder.id, folder.name) },
+          { label: 'New Subfolder', onClick: () => onAddFolder(categoryId, folder.id) },
+          { label: 'Rename Folder', onClick: () => onRenameFolder(categoryId, folder.id, folder.name) },
           {
             label: 'Delete Folder',
-            icon: '🗑️',
             danger: true,
             onClick: () => onDeleteFolder(categoryId, folder.id),
           },
         ]
       : [
-          { label: 'New Folder', icon: '➕', onClick: () => onAddFolder(categoryId, null) },
+          { label: 'New Folder', onClick: () => onAddFolder(categoryId, null) },
           {
             label: 'Rename Category',
-            icon: '✏️',
             onClick: () => onRenameCategory(categoryId, categories.find((c) => c.id === categoryId).name),
           },
-          { label: 'Delete Category', icon: '🗑️', danger: true, onClick: () => onDeleteCategory(categoryId) },
+          { label: 'Delete Category', danger: true, onClick: () => onDeleteCategory(categoryId) },
         ];
     setMenu({ x: event.clientX, y: event.clientY, items });
   };
 
   return (
     <div className="category-filter">
-      <h3>🗂️ Categories</h3>
+      <h3>Categories</h3>
       <div className="categories-list">
         {categories.map((category) => (
           <CategoryNode
@@ -255,7 +248,7 @@ function CategoryTree({
       </div>
 
       <button className="btn btn-outline btn-add-category" onClick={onAddCategory}>
-        ➕ New Category
+        New Category
       </button>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
