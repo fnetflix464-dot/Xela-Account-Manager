@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { createVaultService } from './VaultService.js';
 import { eventBus, VAULT_EVENT_CHANNEL } from './EventBus.js';
+import * as VaultRepository from '../repositories/VaultRepository.js';
 
 function createTestService() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xela-vs-test-'));
@@ -66,6 +67,72 @@ describe('vault lifecycle', () => {
     expect(() => svc.unlock('old-password-123')).toThrow();
     svc.unlock('new-password-123');
     expect(svc.isUnlocked()).toBe(true);
+  });
+});
+
+describe('isVaultFileHealthy', () => {
+  test('true when no vault file exists yet', () => {
+    const svc = createTestService();
+    expect(svc.isVaultFileHealthy()).toBe(true);
+  });
+
+  test('true for a freshly created, well-formed vault file', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(svc.isVaultFileHealthy()).toBe(true);
+  });
+
+  test('false for a structurally corrupted vault file, without needing a password', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xela-vs-test-'));
+    const vaultFilePath = path.join(dir, 'vault.xam');
+    fs.writeFileSync(vaultFilePath, 'not valid json{{{');
+    const svc = createVaultService({ vaultFilePath, backupDir: path.join(dir, 'backups') });
+
+    expect(svc.isUnlocked()).toBe(false);
+    expect(svc.isVaultFileHealthy()).toBe(false);
+  });
+});
+
+describe('restoreBackup', () => {
+  test('works while locked (the whole point, as a recovery path) and leaves the vault locked', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xela-vs-test-'));
+    const vaultFilePath = path.join(dir, 'vault.xam');
+    const backupDir = path.join(dir, 'backups');
+    const svc = createVaultService({ vaultFilePath, backupDir });
+
+    svc.create('supersecretpassword');
+    svc.addCategory('Personal', 'category'); // triggers a backup of the pre-category state
+    svc.lock();
+
+    const [backupPath] = VaultRepository.listBackups(backupDir);
+    expect(() => svc.restoreBackup(backupPath)).not.toThrow();
+    expect(svc.isUnlocked()).toBe(false);
+
+    svc.unlock('supersecretpassword');
+    expect(svc.getVault().categories).toHaveLength(0); // restored the pre-category backup
+  });
+
+  test('recovers a structurally corrupted vault file by restoring a prior backup', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xela-vs-test-'));
+    const vaultFilePath = path.join(dir, 'vault.xam');
+    const backupDir = path.join(dir, 'backups');
+    const setupSvc = createVaultService({ vaultFilePath, backupDir });
+    setupSvc.create('supersecretpassword');
+    setupSvc.addCategory('Personal', 'category'); // backup #1: pre-category (0 categories)
+    setupSvc.addCategory('Work', 'category'); // backup #2: pre-second-category (1 category: Personal)
+    setupSvc.lock();
+    // Most recent backup is the one holding 'Personal' just before 'Work' was added.
+    const [backupPath] = VaultRepository.listBackups(backupDir);
+
+    fs.writeFileSync(vaultFilePath, 'corrupted-not-json{{{');
+    const recoverySvc = createVaultService({ vaultFilePath, backupDir });
+    expect(recoverySvc.isVaultFileHealthy()).toBe(false);
+
+    recoverySvc.restoreBackup(backupPath);
+    expect(recoverySvc.isVaultFileHealthy()).toBe(true);
+    recoverySvc.unlock('supersecretpassword');
+    expect(recoverySvc.getVault().categories).toHaveLength(1);
+    expect(recoverySvc.getVault().categories[0].name).toBe('Personal');
   });
 });
 

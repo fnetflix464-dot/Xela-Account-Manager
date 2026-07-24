@@ -49,6 +49,29 @@ export function readVaultFile(filePath) {
 }
 
 /**
+ * Checks whether the file at filePath at least *looks like* a vault
+ * envelope (valid JSON, has the expected fields) - without needing a
+ * password, since that only guards the encrypted payload inside, not the
+ * outer envelope structure. Returns false (never throws) for anything
+ * that fails this check, so callers can safely use it as a yes/no gate
+ * before even showing a password prompt. This is deliberately NOT the
+ * same question as "is the password correct" - a well-formed envelope
+ * can still fail to decrypt (wrong password), and there's no way to
+ * distinguish that from a tampered ciphertext without the key (that's
+ * inherent to how AES-GCM works, not a gap in this check).
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+export function isVaultFileStructurallyValid(filePath) {
+  try {
+    readVaultFile(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Writes the vault envelope to disk atomically:
  *
  *   vault.tmp -> write -> fsync -> rename -> vault.xam

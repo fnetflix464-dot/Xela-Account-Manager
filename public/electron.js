@@ -169,6 +169,10 @@ handle('set-window-mode', (mode) => {
 // ==================== MASTER PASSWORD / VAULT LIFECYCLE ====================
 
 handle('check-master-password-exists', () => ({ exists: vaultService.vaultFileExists() }));
+// Callable before any password is entered - a structurally broken vault
+// file should be flagged immediately rather than only ever surfacing as
+// a mysterious "incorrect password" on every unlock attempt.
+handle('check-vault-health', () => ({ healthy: vaultService.isVaultFileHealthy() }));
 
 handle('set-master-password', (password) => {
   vaultService.create(password);

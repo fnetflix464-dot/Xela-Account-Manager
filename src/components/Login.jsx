@@ -4,20 +4,42 @@ import { calculatePasswordStrength } from '../utils/passwordStrength';
 
 function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState('verify'); // 'setup' | 'verify' | 'import'
+  const [mode, setMode] = useState('verify'); // 'setup' | 'verify' | 'import' | 'recovery'
   const [previousMode, setPreviousMode] = useState('setup'); // where 'import' returns to on Back
   const [confirmPassword, setConfirmPassword] = useState('');
   const [importPassword, setImportPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [passwordStrength, setPasswordStrength] = useState('');
+  const [backups, setBackups] = useState([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
-    checkMasterPasswordExists();
+    checkVaultStatus();
   }, []);
 
-  const checkMasterPasswordExists = async () => {
+  useEffect(() => {
+    if (mode !== 'recovery') return;
+    setBackupsLoading(true);
+    window.electron.listBackups().then((result) => {
+      setBackups(result.success ? result.data : []);
+      setBackupsLoading(false);
+    });
+  }, [mode]);
+
+  const checkVaultStatus = async () => {
     try {
+      // Checked before checkMasterPasswordExists: a structurally broken
+      // vault.xam should route straight to recovery instead of ever
+      // reaching the normal unlock screen, where it could only ever
+      // surface as a confusing "incorrect password" on every attempt.
+      const health = await window.electron.checkVaultHealth();
+      if (health.success && !health.data.healthy) {
+        setMode('recovery');
+        setLoading(false);
+        return;
+      }
       const result = await window.electron.checkMasterPasswordExists();
       setMode(result.success && result.data.exists ? 'verify' : 'setup');
       setLoading(false);
@@ -133,6 +155,31 @@ function Login({ onLoginSuccess }) {
     }
   };
 
+  const handleRestoreBackup = async (backupPath) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Restore this backup? Your current vault file will be replaced (it is backed up first).')) {
+      return;
+    }
+    setError('');
+    setRestoring(true);
+    try {
+      const result = await window.electron.restoreBackup(backupPath);
+      if (result.success) {
+        // Re-run the full health/existence check against the file that's
+        // now live on disk rather than assuming the restored backup is
+        // itself healthy.
+        setRestoring(false);
+        await checkVaultStatus();
+      } else {
+        setError(result.error || 'Failed to restore backup');
+        setRestoring(false);
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred');
+      setRestoring(false);
+    }
+  };
+
   const getStrengthColor = (strength) => {
     switch (strength) {
       case 'Very Strong':
@@ -154,6 +201,62 @@ function Login({ onLoginSuccess }) {
         <div className="login-box">
           <div className="spinner"></div>
           <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'recovery') {
+    return (
+      <div className="login-container">
+        <div className="login-box">
+          <div className="login-header">
+            <h1>Xela Account Manager</h1>
+            <p>Vault File Needs Attention</p>
+          </div>
+
+          <p className="hint">
+            Your vault.xam file could not be read as a valid vault (it may have been damaged by an
+            interrupted write, disk error, or manual edit). Restoring a backup below will replace it -
+            the current file is backed up first, so nothing is discarded.
+          </p>
+
+          {error && <div className="error-message">{error}</div>}
+
+          {backupsLoading ? (
+            <p>Checking for backups...</p>
+          ) : backups.length === 0 ? (
+            <p className="hint">No backups are available to restore from.</p>
+          ) : (
+            <ul className="backup-list">
+              {backups.map((backupPath) => (
+                <li key={backupPath} className="backup-list-item">
+                  <span>{backupPath.split(/[\\/]/).pop()}</span>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={restoring}
+                    onClick={() => handleRestoreBackup(backupPath)}
+                  >
+                    {restoring ? 'Restoring...' : 'Restore'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="login-footer">
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                setError('');
+                setMode('verify');
+              }}
+            >
+              ← Back to unlock screen
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -299,6 +402,18 @@ function Login({ onLoginSuccess }) {
           >
             {mode === 'setup' ? '📂 Import an existing vault instead' : '📂 Import a different vault'}
           </button>
+          {mode === 'verify' && (
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                setError('');
+                setMode('recovery');
+              }}
+            >
+              Trouble unlocking? Restore from a backup
+            </button>
+          )}
         </div>
       </div>
     </div>

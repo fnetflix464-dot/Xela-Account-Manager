@@ -153,3 +153,31 @@ describe('readVaultFile', () => {
     expect(() => FileService.readVaultFile(filePath)).toThrow(/missing required fields/i);
   });
 });
+
+describe('isVaultFileStructurallyValid', () => {
+  test('returns true for a well-formed vault envelope', () => {
+    const dir = tempDir();
+    const filePath = path.join(dir, 'vault.xam');
+    FileService.writeVaultFile(filePath, sampleEnvelope());
+    expect(FileService.isVaultFileStructurallyValid(filePath)).toBe(true);
+  });
+
+  test('returns false (never throws) for a missing file', () => {
+    const dir = tempDir();
+    expect(FileService.isVaultFileStructurallyValid(path.join(dir, 'missing.xam'))).toBe(false);
+  });
+
+  test('returns false (never throws) for invalid JSON', () => {
+    const dir = tempDir();
+    const filePath = path.join(dir, 'vault.xam');
+    fs.writeFileSync(filePath, 'not valid json{{{');
+    expect(FileService.isVaultFileStructurallyValid(filePath)).toBe(false);
+  });
+
+  test('returns false (never throws) when required fields are missing', () => {
+    const dir = tempDir();
+    const filePath = path.join(dir, 'vault.xam');
+    fs.writeFileSync(filePath, JSON.stringify({ salt: 'x' }));
+    expect(FileService.isVaultFileStructurallyValid(filePath)).toBe(false);
+  });
+});

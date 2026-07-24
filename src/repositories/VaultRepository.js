@@ -15,6 +15,16 @@ export function exists(vaultFilePath) {
 }
 
 /**
+ * True if the vault file at vaultFilePath is at least well-formed (valid
+ * JSON, has the expected envelope fields) - answerable without a
+ * password. See FileService.isVaultFileStructurallyValid for why this is
+ * deliberately a different question from "is the password correct".
+ */
+export function isStructurallyValid(vaultFilePath) {
+  return FileService.isVaultFileStructurallyValid(vaultFilePath);
+}
+
+/**
  * Derives a brand-new key/salt pair for a master password (used both for
  * first-time vault creation and for a master-password change).
  */

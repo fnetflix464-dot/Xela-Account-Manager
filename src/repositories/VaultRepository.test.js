@@ -138,6 +138,34 @@ describe('exportTo / importFrom / replaceLiveFile', () => {
   });
 });
 
+describe('isStructurallyValid', () => {
+  test('true for a freshly created vault file', () => {
+    const { vaultFilePath, backupDir } = tempPaths();
+    VaultRepository.create(vaultFilePath, backupDir, 'password123', sampleVault());
+    expect(VaultRepository.isStructurallyValid(vaultFilePath)).toBe(true);
+  });
+
+  test('false for a missing vault file', () => {
+    const { vaultFilePath } = tempPaths();
+    expect(VaultRepository.isStructurallyValid(vaultFilePath)).toBe(false);
+  });
+
+  test('false for a corrupted (non-JSON) vault file, and never throws', () => {
+    const { vaultFilePath, dir } = tempPaths();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(vaultFilePath, 'not valid json{{{');
+    expect(() => VaultRepository.isStructurallyValid(vaultFilePath)).not.toThrow();
+    expect(VaultRepository.isStructurallyValid(vaultFilePath)).toBe(false);
+  });
+
+  test('true for a well-formed envelope even with the wrong password (structural check only)', () => {
+    const { vaultFilePath, backupDir } = tempPaths();
+    VaultRepository.create(vaultFilePath, backupDir, 'right-password', sampleVault());
+    expect(VaultRepository.isStructurallyValid(vaultFilePath)).toBe(true);
+    expect(() => VaultRepository.load(vaultFilePath, 'wrong-password')).toThrow();
+  });
+});
+
 describe('listBackups', () => {
   test('reflects backups created by save()', () => {
     const { vaultFilePath, backupDir } = tempPaths();

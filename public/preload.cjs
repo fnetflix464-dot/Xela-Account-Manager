@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electron', {
   // verifyMasterPassword) so the existing Login screen keeps working
   // unchanged against the new vault-backed implementation.
   checkMasterPasswordExists: () => ipcRenderer.invoke('check-master-password-exists'),
+  checkVaultHealth: () => ipcRenderer.invoke('check-vault-health'),
   setMasterPassword: (password) => ipcRenderer.invoke('set-master-password', password),
   verifyMasterPassword: (password) => ipcRenderer.invoke('verify-master-password', password),
   lockVault: () => ipcRenderer.invoke('lock-vault'),

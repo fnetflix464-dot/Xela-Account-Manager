@@ -31,6 +31,18 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     return VaultRepository.exists(vaultFilePath);
   }
 
+  /**
+   * Reports whether the vault file (if any) is at least well-formed,
+   * without needing a password. Callable while locked - it's meant to be
+   * checked at launch, before the user has entered anything, so a
+   * genuinely corrupted file can be flagged immediately instead of only
+   * surfacing as a mysterious "incorrect password" on every attempt.
+   */
+  function isVaultFileHealthy() {
+    if (!vaultFileExists()) return true; // nothing to be unhealthy yet
+    return VaultRepository.isStructurallyValid(vaultFilePath);
+  }
+
   function isUnlocked() {
     return sessionKey !== null && vault !== null;
   }
@@ -591,10 +603,14 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     return VaultRepository.listBackups(backupDir);
   }
 
+  // Deliberately callable while locked (or even while the live vault file
+  // is unreadable/corrupted) - this is the whole point of it as a
+  // recovery path. Falls back to the model's default backupCount (10)
+  // when there's no unlocked vault to read the real setting from.
   function restoreBackup(backupPath) {
-    const keepCount = getSettings().backupCount;
+    const keepCount = isUnlocked() ? getSettings().backupCount : 10;
     VaultRepository.restoreBackup(backupPath, vaultFilePath, backupDir, keepCount);
-    lock();
+    if (isUnlocked()) lock();
   }
 
   // ---- search ------------------------------------------------------------
@@ -606,6 +622,7 @@ export function createVaultService({ vaultFilePath, backupDir }) {
 
   return {
     vaultFileExists,
+    isVaultFileHealthy,
     isUnlocked,
     lock,
     create,
