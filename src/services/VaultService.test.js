@@ -611,6 +611,25 @@ describe('settings validation', () => {
     expect(() => svc.updateVaultSettings({ accentColor: '#fff' })).toThrow(/hex color/i);
   });
 
+  test('backgroundColor defaults to null and accepts a valid 6-digit hex color', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(svc.getSettings().backgroundColor).toBeNull();
+
+    const after = svc.updateVaultSettings({ backgroundColor: '#101820' });
+    expect(after.backgroundColor).toBe('#101820');
+
+    const reset = svc.updateVaultSettings({ backgroundColor: null });
+    expect(reset.backgroundColor).toBeNull();
+  });
+
+  test('rejects a malformed backgroundColor', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(() => svc.updateVaultSettings({ backgroundColor: 'blue' })).toThrow(/hex color/i);
+    expect(() => svc.updateVaultSettings({ backgroundColor: '#fff' })).toThrow(/hex color/i);
+  });
+
   test('backgroundImage defaults to null, accepts a data URI, and rejects non-image values', () => {
     const svc = createTestService();
     svc.create('supersecretpassword');

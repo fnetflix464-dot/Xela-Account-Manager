@@ -2,8 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import '../styles/Settings.css';
 import { resizeImageToDataUrl } from '../utils/imageResize';
 
-function Settings({ onSettingsChanged }) {
-  const [settings, setSettings] = useState(null);
+function Settings({ settings: settingsProp, onSettingsChanged }) {
+  // Seeded once from the live (possibly still-unsaved, already-previewed)
+  // App-level settings rather than re-fetched from disk on every mount -
+  // this component used to always pull the persisted value fresh, which
+  // meant navigating away and back after previewing an unsaved change
+  // (e.g. a background image) silently reverted the form to the old
+  // value while the rest of the app kept showing the preview, making
+  // controls like "remove background image" disappear even though the
+  // image was still visibly applied.
+  const [settings, setSettings] = useState(settingsProp || null);
   const [backups, setBackups] = useState([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -19,16 +27,25 @@ function Settings({ onSettingsChanged }) {
   const [confirmNewPin, setConfirmNewPin] = useState('');
 
   const load = useCallback(async () => {
-    const [settingsResult, backupsResult, quickUnlockAvailableResult, quickUnlockEnabledResult] = await Promise.all([
-      window.electron.getSettings(),
+    // Fallback only - in normal operation App.jsx has already loaded
+    // settings by the time this component can be reached, and re-fetching
+    // here would clobber any unsaved live-previewed change with the
+    // stale persisted value.
+    if (!settingsProp) {
+      const settingsResult = await window.electron.getSettings();
+      if (settingsResult.success) setSettings(settingsResult.data);
+    }
+    const [backupsResult, quickUnlockAvailableResult, quickUnlockEnabledResult] = await Promise.all([
       window.electron.listBackups(),
       window.electron.isQuickUnlockAvailable(),
       window.electron.isQuickUnlockEnabled(),
     ]);
-    if (settingsResult.success) setSettings(settingsResult.data);
     if (backupsResult.success) setBackups(backupsResult.data);
     if (quickUnlockAvailableResult.success) setQuickUnlockAvailable(quickUnlockAvailableResult.data.available);
     if (quickUnlockEnabledResult.success) setQuickUnlockEnabled(quickUnlockEnabledResult.data.enabled);
+    // Deliberately checks settingsProp only as it was at mount time (same
+    // as the useState initializer above) - this only ever runs once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -55,6 +72,14 @@ function Settings({ onSettingsChanged }) {
   const handleAccentColorChange = (value) => {
     setSettings((prev) => {
       const next = { ...prev, accentColor: value };
+      onSettingsChanged(next);
+      return next;
+    });
+  };
+
+  const handleBackgroundColorChange = (value) => {
+    setSettings((prev) => {
+      const next = { ...prev, backgroundColor: value };
       onSettingsChanged(next);
       return next;
     });
@@ -248,6 +273,21 @@ function Settings({ onSettingsChanged }) {
             />
             {settings.accentColor && (
               <button type="button" className="btn-link" onClick={() => handleAccentColorChange(null)}>
+                Reset to default
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="setting-item">
+          <label>Background color</label>
+          <div className="accent-color-picker">
+            <input
+              type="color"
+              value={settings.backgroundColor || '#f9fafb'}
+              onChange={(e) => handleBackgroundColorChange(e.target.value)}
+            />
+            {settings.backgroundColor && (
+              <button type="button" className="btn-link" onClick={() => handleBackgroundColorChange(null)}>
                 Reset to default
               </button>
             )}

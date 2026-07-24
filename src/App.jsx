@@ -10,7 +10,7 @@ import Settings from './components/Settings';
 import ContextMenu from './components/ContextMenu';
 import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree';
 import { useUndoRedo } from './hooks/useUndoRedo';
-import { applyTheme, applyAccentColor } from './utils/theme';
+import { applyTheme, applyAccentColor, applyBackgroundColor } from './utils/theme';
 import { entryTemplates } from './data/entryTemplates.js';
 
 const ENTRY_TEMPLATES = entryTemplates.map((t) => t.name);
@@ -136,6 +136,7 @@ function App() {
     const preference = settings ? settings.theme : 'system';
     applyTheme(preference);
     applyAccentColor(settings ? settings.accentColor : null);
+    applyBackgroundColor(settings ? settings.backgroundColor : null);
 
     if (preference === 'system') {
       const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -602,7 +603,7 @@ function App() {
 
       {activeTab === 'settings' && (
         <main className="main-panel">
-          <Settings onSettingsChanged={setSettings} />
+          <Settings settings={settings} onSettingsChanged={setSettings} />
         </main>
       )}
 

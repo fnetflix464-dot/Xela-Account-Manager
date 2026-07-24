@@ -37,6 +37,9 @@ export function createSettings(overrides = {}) {
     // accent is an override on top of the light/dark palette, not a
     // replacement for it.
     accentColor: typeof overrides.accentColor === 'string' ? overrides.accentColor : null,
+    // Same "override on top of the theme" idea as accentColor, but for
+    // the app's base background instead of its accent.
+    backgroundColor: typeof overrides.backgroundColor === 'string' ? overrides.backgroundColor : null,
     // Opt-in only, off (null) by default - a base64 data URI (already
     // resized/compressed by the renderer before it ever reaches here).
     backgroundImage: typeof overrides.backgroundImage === 'string' ? overrides.backgroundImage : null,

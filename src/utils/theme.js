@@ -45,3 +45,20 @@ export function applyAccentColor(accentColor) {
     root.removeProperty('--color-active-bg');
   }
 }
+
+/**
+ * Overrides the theme's base app background (--color-bg-app) - the outer
+ * shell behind the sidebar/header/cards, same element a custom
+ * background image applies to. Deliberately leaves --color-bg-surface
+ * (cards, sidebar, header) alone, same reasoning as index.css's own
+ * "only chrome backgrounds/text/borders are themed, not every surface"
+ * design: a custom base color is a background choice, not a full skin.
+ */
+export function applyBackgroundColor(backgroundColor) {
+  const root = document.documentElement.style;
+  if (backgroundColor) {
+    root.setProperty('--color-bg-app', backgroundColor);
+  } else {
+    root.removeProperty('--color-bg-app');
+  }
+}

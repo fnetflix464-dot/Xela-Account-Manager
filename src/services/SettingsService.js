@@ -66,6 +66,11 @@ export function validate(settings) {
       throw new Error('Accent color must be a 6-digit hex color (e.g. #667eea) or null');
     }
   }
+  if (settings.backgroundColor !== null && typeof settings.backgroundColor !== 'undefined') {
+    if (typeof settings.backgroundColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(settings.backgroundColor)) {
+      throw new Error('Background color must be a 6-digit hex color (e.g. #f9fafb) or null');
+    }
+  }
   if (settings.backgroundImage !== null && typeof settings.backgroundImage !== 'undefined') {
     if (typeof settings.backgroundImage !== 'string' || !settings.backgroundImage.startsWith('data:image/')) {
       throw new Error('Background image must be an image data URI or null');
