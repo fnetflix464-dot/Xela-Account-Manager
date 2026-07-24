@@ -33,6 +33,10 @@ export function createSettings(overrides = {}) {
     // 0 disables history entirely (no past values retained).
     passwordHistoryLimit:
       typeof overrides.passwordHistoryLimit === 'number' ? overrides.passwordHistoryLimit : 20,
+    // null means "use the theme's built-in accent color" - a custom
+    // accent is an override on top of the light/dark palette, not a
+    // replacement for it.
+    accentColor: typeof overrides.accentColor === 'string' ? overrides.accentColor : null,
   };
 }
 

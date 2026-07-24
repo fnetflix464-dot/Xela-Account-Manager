@@ -10,7 +10,7 @@ import Settings from './components/Settings';
 import ContextMenu from './components/ContextMenu';
 import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree';
 import { useUndoRedo } from './hooks/useUndoRedo';
-import { applyTheme } from './utils/theme';
+import { applyTheme, applyAccentColor } from './utils/theme';
 import { entryTemplates } from './data/entryTemplates.js';
 
 const ENTRY_TEMPLATES = entryTemplates.map((t) => t.name);
@@ -135,6 +135,7 @@ function App() {
   useEffect(() => {
     const preference = settings ? settings.theme : 'system';
     applyTheme(preference);
+    applyAccentColor(settings ? settings.accentColor : null);
 
     if (preference === 'system') {
       const media = window.matchMedia('(prefers-color-scheme: dark)');

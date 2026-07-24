@@ -493,6 +493,25 @@ describe('settings validation', () => {
     expect(after.theme).toBe('dark');
     expect(after.autoLockMinutes).toBe(before.autoLockMinutes);
   });
+
+  test('accentColor defaults to null and accepts a valid 6-digit hex color', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(svc.getSettings().accentColor).toBeNull();
+
+    const after = svc.updateVaultSettings({ accentColor: '#ff8800' });
+    expect(after.accentColor).toBe('#ff8800');
+
+    const reset = svc.updateVaultSettings({ accentColor: null });
+    expect(reset.accentColor).toBeNull();
+  });
+
+  test('rejects a malformed accentColor', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(() => svc.updateVaultSettings({ accentColor: 'blue' })).toThrow(/hex color/i);
+    expect(() => svc.updateVaultSettings({ accentColor: '#fff' })).toThrow(/hex color/i);
+  });
 });
 
 describe('search', () => {

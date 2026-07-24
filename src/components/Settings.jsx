@@ -43,6 +43,14 @@ function Settings({ onSettingsChanged }) {
     });
   };
 
+  const handleAccentColorChange = (value) => {
+    setSettings((prev) => {
+      const next = { ...prev, accentColor: value };
+      onSettingsChanged(next);
+      return next;
+    });
+  };
+
   const handleGeneratorChange = (field, value) => {
     setSettings((prev) => ({ ...prev, passwordGenerator: { ...prev.passwordGenerator, [field]: value } }));
   };
@@ -173,6 +181,21 @@ function Settings({ onSettingsChanged }) {
             <option value="dark">Dark</option>
             <option value="system">System</option>
           </select>
+        </div>
+        <div className="setting-item">
+          <label>Accent color</label>
+          <div className="accent-color-picker">
+            <input
+              type="color"
+              value={settings.accentColor || '#667eea'}
+              onChange={(e) => handleAccentColorChange(e.target.value)}
+            />
+            {settings.accentColor && (
+              <button type="button" className="btn-link" onClick={() => handleAccentColorChange(null)}>
+                Reset to default
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

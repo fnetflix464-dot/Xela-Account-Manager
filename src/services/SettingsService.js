@@ -56,6 +56,11 @@ export function validate(settings) {
       throw new Error('Password history limit must be zero (disabled) or greater');
     }
   }
+  if (settings.accentColor !== null && typeof settings.accentColor !== 'undefined') {
+    if (typeof settings.accentColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(settings.accentColor)) {
+      throw new Error('Accent color must be a 6-digit hex color (e.g. #667eea) or null');
+    }
+  }
 }
 
 /**
