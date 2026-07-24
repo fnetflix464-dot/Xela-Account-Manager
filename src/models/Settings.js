@@ -19,7 +19,7 @@ export function createSettings(overrides = {}) {
     theme: THEMES.includes(overrides.theme) ? overrides.theme : 'system',
     autoLockMinutes:
       typeof overrides.autoLockMinutes === 'number' ? overrides.autoLockMinutes : 5,
-    backupCount: typeof overrides.backupCount === 'number' ? overrides.backupCount : 10,
+    backupCount: typeof overrides.backupCount === 'number' ? overrides.backupCount : 5,
     passwordGenerator: {
       ...DEFAULT_PASSWORD_GENERATOR_SETTINGS,
       ...(overrides.passwordGenerator || {}),

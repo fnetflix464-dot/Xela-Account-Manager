@@ -62,3 +62,39 @@ export function applyBackgroundColor(backgroundColor) {
     root.removeProperty('--color-bg-app');
   }
 }
+
+function hexToRgba(hex, alpha) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = (num >> 16) & 0xff;
+  const g = (num >> 8) & 0xff;
+  const b = num & 0xff;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const PANEL_OPACITY = 0.88;
+
+/**
+ * Makes cards/sidebar/header (--color-bg-surface, --color-bg-surface-alt)
+ * a little translucent instead of fully opaque, so a custom background
+ * image/color is actually visible behind the UI rather than fully hidden
+ * behind it. Only takes effect when `active` is true (a custom background
+ * is actually set) - reads the theme's own current color first via
+ * getComputedStyle so this works correctly under both light and dark
+ * (and doesn't need to know either palette's values itself), then applies
+ * an alpha version of exactly that color as an inline override.
+ */
+export function applyPanelTranslucency(active) {
+  const root = document.documentElement;
+  if (!active) {
+    root.style.removeProperty('--color-bg-surface');
+    root.style.removeProperty('--color-bg-surface-alt');
+    return;
+  }
+  const computed = getComputedStyle(root);
+  const surface = computed.getPropertyValue('--color-bg-surface').trim();
+  const surfaceAlt = computed.getPropertyValue('--color-bg-surface-alt').trim();
+  if (surface.startsWith('#')) root.style.setProperty('--color-bg-surface', hexToRgba(surface, PANEL_OPACITY));
+  if (surfaceAlt.startsWith('#')) {
+    root.style.setProperty('--color-bg-surface-alt', hexToRgba(surfaceAlt, PANEL_OPACITY));
+  }
+}

@@ -10,7 +10,7 @@ import Settings from './components/Settings';
 import ContextMenu from './components/ContextMenu';
 import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree';
 import { useUndoRedo } from './hooks/useUndoRedo';
-import { applyTheme, applyAccentColor, applyBackgroundColor } from './utils/theme';
+import { applyTheme, applyAccentColor, applyBackgroundColor, applyPanelTranslucency } from './utils/theme';
 import { entryTemplates } from './data/entryTemplates.js';
 
 const ENTRY_TEMPLATES = entryTemplates.map((t) => t.name);
@@ -134,15 +134,22 @@ function App() {
   // light/dark choice shouldn't shift out from under the user.
   useEffect(() => {
     const preference = settings ? settings.theme : 'system';
-    applyTheme(preference);
-    applyAccentColor(settings ? settings.accentColor : null);
-    applyBackgroundColor(settings ? settings.backgroundColor : null);
+    const hasCustomBackground = !!(settings && (settings.backgroundImage || settings.backgroundColor));
+
+    const applyAll = () => {
+      applyTheme(preference);
+      applyAccentColor(settings ? settings.accentColor : null);
+      applyBackgroundColor(settings ? settings.backgroundColor : null);
+      // Depends on the theme's own resolved surface color, so it must run
+      // after applyTheme (above) has set data-theme for this render.
+      applyPanelTranslucency(hasCustomBackground);
+    };
+    applyAll();
 
     if (preference === 'system') {
       const media = window.matchMedia('(prefers-color-scheme: dark)');
-      const handleChange = () => applyTheme(preference);
-      media.addEventListener('change', handleChange);
-      return () => media.removeEventListener('change', handleChange);
+      media.addEventListener('change', applyAll);
+      return () => media.removeEventListener('change', applyAll);
     }
     return undefined;
   }, [settings]);

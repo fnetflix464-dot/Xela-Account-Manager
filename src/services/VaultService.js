@@ -711,7 +711,7 @@ export function createVaultService({ vaultFilePath, backupDir, quickUnlockFilePa
       throw new Error('Import file is not a valid vault');
     }
 
-    VaultRepository.replaceLiveFile(sourcePath, vaultFilePath, backupDir, decrypted.settings.backupCount || 10);
+    VaultRepository.replaceLiveFile(sourcePath, vaultFilePath, backupDir, decrypted.settings.backupCount || 5);
 
     wipeKeyMaterial();
     salt = newSalt;
@@ -730,10 +730,10 @@ export function createVaultService({ vaultFilePath, backupDir, quickUnlockFilePa
 
   // Deliberately callable while locked (or even while the live vault file
   // is unreadable/corrupted) - this is the whole point of it as a
-  // recovery path. Falls back to the model's default backupCount (10)
+  // recovery path. Falls back to the model's default backupCount (5)
   // when there's no unlocked vault to read the real setting from.
   function restoreBackup(backupPath) {
-    const keepCount = isUnlocked() ? getSettings().backupCount : 10;
+    const keepCount = isUnlocked() ? getSettings().backupCount : 5;
     VaultRepository.restoreBackup(backupPath, vaultFilePath, backupDir, keepCount);
     if (isUnlocked()) lock();
     invalidateQuickUnlock();
