@@ -491,14 +491,6 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
         {backups.length > 20 && <p className="hint">Showing the 20 most recent of {backups.length} backups.</p>}
       </div>
 
-      {saved && <div className="success-message">Saved successfully</div>}
-
-      <div className="settings-actions">
-        <button className="btn btn-primary" onClick={handleSave}>
-          Save Settings
-        </button>
-      </div>
-
       <div className="settings-section">
         <h3>Change Master Password</h3>
         <form onSubmit={handleChangePassword}>
@@ -591,6 +583,14 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
         </div>
         <button className="btn btn-secondary" onClick={handleImport}>
           Import Vault (.xam)
+        </button>
+      </div>
+
+      {saved && <div className="success-message">Saved successfully</div>}
+
+      <div className="settings-actions">
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save Settings
         </button>
       </div>
     </div>

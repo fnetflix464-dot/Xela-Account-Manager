@@ -19,11 +19,28 @@
   margin-bottom: 0.5rem;
 }
 
-.app-header h1 {
+.app-wordmark {
   margin: 0;
-  font-size: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.app-wordmark-main {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--color-text-primary);
+  text-shadow: 1px 1px 0 var(--color-active-bg), 2px 2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.app-wordmark-sub {
+  margin-top: 0.15rem;
+  font-size: 0.55rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .header-actions {

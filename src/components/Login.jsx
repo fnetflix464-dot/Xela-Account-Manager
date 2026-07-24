@@ -247,7 +247,10 @@ function Login({ onLoginSuccess }) {
       <div className="login-container">
         <div className="login-box">
           <div className="login-header">
-            <h1>Xela Account Manager</h1>
+            <h1 className="app-wordmark login-wordmark">
+              <span className="app-wordmark-main">XELA</span>
+              <span className="app-wordmark-sub">Account Manager</span>
+            </h1>
             <p>Vault File Needs Attention</p>
           </div>
 
@@ -303,7 +306,10 @@ function Login({ onLoginSuccess }) {
       <div className="login-container">
         <div className="login-box">
           <div className="login-header">
-            <h1>Xela Account Manager</h1>
+            <h1 className="app-wordmark login-wordmark">
+              <span className="app-wordmark-main">XELA</span>
+              <span className="app-wordmark-sub">Account Manager</span>
+            </h1>
             <p>Unlock Your Accounts</p>
           </div>
 
@@ -355,7 +361,10 @@ function Login({ onLoginSuccess }) {
       <div className="login-container">
         <div className="login-box">
           <div className="login-header">
-            <h1>Xela Account Manager</h1>
+            <h1 className="app-wordmark login-wordmark">
+              <span className="app-wordmark-main">XELA</span>
+              <span className="app-wordmark-sub">Account Manager</span>
+            </h1>
             <p>Import an Existing Vault</p>
           </div>
 
@@ -409,7 +418,10 @@ function Login({ onLoginSuccess }) {
     <div className="login-container">
       <div className="login-box">
         <div className="login-header">
-          <h1>Xela Account Manager</h1>
+          <h1 className="app-wordmark login-wordmark">
+            <span className="app-wordmark-main">XELA</span>
+            <span className="app-wordmark-sub">Account Manager</span>
+          </h1>
           <p>{mode === 'setup' ? 'Set Your Master Password' : 'Unlock Your Accounts'}</p>
         </div>
 

@@ -453,7 +453,10 @@ function App() {
     >
       <header className="app-header">
         <div className="app-header-top">
-          <h1>Xela Account Manager</h1>
+          <h1 className="app-wordmark">
+            <span className="app-wordmark-main">XELA</span>
+            <span className="app-wordmark-sub">Account Manager</span>
+          </h1>
           <div className="header-actions">
             <button
               className={`btn-icon ${['recycle', 'activity', 'settings'].includes(activeTab) ? 'active' : ''}`}
