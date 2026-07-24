@@ -1,26 +1,65 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const isDev = require('electron-is-dev');
 const path = require('path');
-const AccountDatabase = require('./database');
+
+const { createVaultService } = require('../src/services/VaultService');
 
 let mainWindow;
-let db;
+let vaultService;
+let autoLockTimer = null;
 
-// Initialize database
-function initializeDatabase() {
-  db = new AccountDatabase();
+function vaultFilePath() {
+  return path.join(app.getPath('userData'), 'vault.xam');
+}
+
+function backupDirPath() {
+  return path.join(app.getPath('userData'), 'backups');
+}
+
+function initializeVaultService() {
+  vaultService = createVaultService({
+    vaultFilePath: vaultFilePath(),
+    backupDir: backupDirPath(),
+  });
+}
+
+// ---- auto-lock -------------------------------------------------------
+// Any successful IPC call resets the idle timer. When it fires, the vault
+// is locked in memory and the renderer is notified to show the unlock
+// screen again. Purely local - no network, no telemetry.
+function resetAutoLockTimer() {
+  if (autoLockTimer) clearTimeout(autoLockTimer);
+  if (!vaultService || !vaultService.isUnlocked()) return;
+
+  let minutes = 5;
+  try {
+    minutes = vaultService.getSettings().autoLockMinutes;
+  } catch {
+    // vault locked mid-read; ignore
+  }
+  if (!minutes || minutes <= 0) return; // 0/undefined disables auto-lock
+
+  autoLockTimer = setTimeout(() => {
+    if (vaultService && vaultService.isUnlocked()) {
+      vaultService.lock();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('vault-auto-locked');
+      }
+    }
+  }, minutes * 60 * 1000);
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
+    width: 1280,
+    height: 840,
+    minWidth: 900,
     minHeight: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      enableRemoteModule: false,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
 
@@ -40,11 +79,14 @@ function createWindow() {
 }
 
 app.on('ready', () => {
-  initializeDatabase();
+  initializeVaultService();
   createWindow();
 });
 
 app.on('window-all-closed', () => {
+  if (vaultService && vaultService.isUnlocked()) {
+    vaultService.lock();
+  }
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -56,219 +98,124 @@ app.on('activate', () => {
   }
 });
 
-// ==================== IPC HANDLERS ====================
+// Every IPC handler below is wrapped the same way: try/catch, return
+// { success, data|error }, and reset the auto-lock idle timer on success.
+function handle(channel, fn) {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      const data = await fn(...args);
+      resetAutoLockTimer();
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+}
 
-// MASTER PASSWORD HANDLERS
-ipcMain.handle('set-master-password', (event, password) => {
-  try {
-    db.setMasterPassword(password);
-    return { success: true, message: 'Master password set successfully' };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+// ==================== MASTER PASSWORD / VAULT LIFECYCLE ====================
+
+handle('check-master-password-exists', () => ({ exists: vaultService.vaultFileExists() }));
+
+handle('set-master-password', (password) => {
+  vaultService.create(password);
+  return true;
 });
 
-ipcMain.handle('verify-master-password', (event, password) => {
-  try {
-    const isValid = db.verifyMasterPassword(password);
-    return { success: isValid, message: isValid ? 'Authenticated' : 'Invalid password' };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+handle('verify-master-password', (password) => {
+  vaultService.unlock(password);
+  return true;
 });
 
-ipcMain.handle('check-master-password-exists', () => {
-  try {
-    const hash = db.getSetting('masterPasswordHash');
-    return { exists: !!hash };
-  } catch (error) {
-    return { exists: false, error: error.message };
-  }
+handle('lock-vault', () => {
+  vaultService.lock();
+  return true;
 });
 
-// ACCOUNT HANDLERS
-ipcMain.handle('add-account', (event, account) => {
-  try {
-    const result = db.addAccount(account);
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+handle('change-master-password', (currentPassword, newPassword) =>
+  vaultService.changeMasterPassword(currentPassword, newPassword),
+);
+
+// ==================== CATEGORIES ====================
+
+handle('get-vault-tree', () => vaultService.getVault().categories);
+handle('add-category', (name, icon) => vaultService.addCategory(name, icon));
+handle('rename-category', (categoryId, name) => vaultService.renameCategory(categoryId, name));
+handle('delete-category', (categoryId) => vaultService.deleteCategory(categoryId));
+
+// ==================== FOLDERS ====================
+
+handle('add-folder', (categoryId, parentFolderId, name) =>
+  vaultService.addFolder(categoryId, parentFolderId, name),
+);
+handle('rename-folder', (categoryId, folderId, name) => vaultService.renameFolder(categoryId, folderId, name));
+handle('delete-folder', (categoryId, folderId) => vaultService.deleteFolder(categoryId, folderId));
+handle('move-folder', (folderId, targetCategoryId, targetParentFolderId) =>
+  vaultService.moveFolder(folderId, targetCategoryId, targetParentFolderId),
+);
+
+// ==================== ENTRIES ====================
+
+handle('add-entry', (categoryId, folderId, entryData) =>
+  vaultService.addEntry(categoryId, folderId, entryData),
+);
+handle('update-entry', (entryId, updates) => vaultService.updateEntryFields(entryId, updates));
+handle('delete-entry', (entryId) => vaultService.deleteEntry(entryId));
+handle('move-entry', (entryId, targetCategoryId, targetFolderId) =>
+  vaultService.moveEntry(entryId, targetCategoryId, targetFolderId),
+);
+handle('duplicate-entry', (entryId) => vaultService.duplicateEntryById(entryId));
+handle('toggle-favorite', (entryId) => vaultService.toggleFavorite(entryId));
+handle('list-favorites', () => vaultService.listFavorites());
+handle('list-recent-activity', (limit) => vaultService.listRecentActivity(limit));
+
+// ==================== RECYCLE BIN ====================
+
+handle('get-recycle-bin', () => vaultService.getVault().recycleBin);
+handle('restore-from-recycle-bin', (recycleId) => vaultService.restoreFromRecycleBin(recycleId));
+handle('permanently-delete', (recycleId) => vaultService.permanentlyDelete(recycleId));
+handle('empty-recycle-bin', () => vaultService.emptyRecycleBin());
+
+// ==================== SEARCH ====================
+
+handle('search-vault', (query) => vaultService.search(query));
+
+// ==================== SETTINGS ====================
+
+handle('get-settings', () => vaultService.getSettings());
+handle('update-settings', (updates) => vaultService.updateVaultSettings(updates));
+
+// ==================== BACKUP / IMPORT / EXPORT ====================
+
+handle('list-backups', () => {
+  const BackupService = require('../src/services/BackupService');
+  return BackupService.listBackups(backupDirPath());
 });
 
-ipcMain.handle('get-accounts', () => {
-  try {
-    const accounts = db.getAccounts();
-    return { success: true, data: accounts };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+handle('restore-backup', (backupPath) => {
+  const BackupService = require('../src/services/BackupService');
+  BackupService.restoreBackup(backupPath, vaultFilePath(), backupDirPath(), vaultService.getSettings().backupCount);
+  vaultService.lock();
+  return true;
 });
 
-ipcMain.handle('get-account', (event, id) => {
-  try {
-    const account = db.getAccount(id);
-    return { success: true, data: account };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+handle('export-vault', async () => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export Vault',
+    defaultPath: 'vault-export.xam',
+    filters: [{ name: 'Xela Vault', extensions: ['xam'] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  vaultService.exportVaultTo(result.filePath);
+  return result.filePath;
 });
 
-ipcMain.handle('update-account', (event, id, account) => {
-  try {
-    const result = db.updateAccount(id, account);
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('delete-account', (event, id) => {
-  try {
-    db.deleteAccount(id);
-    return { success: true, message: 'Account deleted' };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// PASSWORD STRENGTH HANDLER
-ipcMain.handle('validate-password-strength', (event, password) => {
-  try {
-    const strength = db.calculatePasswordStrength(password);
-    return { success: true, strength };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// 2FA HANDLERS
-ipcMain.handle('enable-2fa', (event, accountId, method, backupCodes) => {
-  try {
-    const result = db.enable2FA(accountId, method, backupCodes);
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('disable-2fa', (event, accountId) => {
-  try {
-    const result = db.disable2FA(accountId);
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('get-2fa-status', (event, accountId) => {
-  try {
-    const status = db.get2FAStatus(accountId);
-    return { success: true, data: status };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// BACKUP HANDLERS
-ipcMain.handle('create-backup', () => {
-  try {
-    const backup = db.createBackup();
-    return { success: true, data: backup };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('create-auto-backup', () => {
-  try {
-    const backup = db.createAutoBackup();
-    return { success: true, data: backup };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('restore-backup', (event, backupData) => {
-  try {
-    const result = db.restoreBackup(backupData);
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('get-backup-history', (event, limit = 10) => {
-  try {
-    const backups = db.getBackupHistory(limit);
-    return { success: true, data: backups };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// SECURITY HANDLERS
-ipcMain.handle('get-security-stats', () => {
-  try {
-    const stats = db.getSecurityStats();
-    return { success: true, data: stats };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('get-audit-log', (event, limit = 50) => {
-  try {
-    const logs = db.getAuditLog(limit);
-    return { success: true, data: logs };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// SETTINGS HANDLERS
-ipcMain.handle('get-setting', (event, key) => {
-  try {
-    const value = db.getSetting(key);
-    return { success: true, data: value };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('set-setting', (event, key, value) => {
-  try {
-    db.setSetting(key, value);
-    return { success: true, message: 'Setting saved' };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('get-all-settings', () => {
-  try {
-    const settings = db.getAllSettings();
-    return { success: true, data: settings };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// SYNC LOG HANDLERS
-ipcMain.handle('record-cloud-sync', (event, action, accountId, status, error, cloudProvider) => {
-  try {
-    db.recordCloudSync(action, accountId, status, error, cloudProvider);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('get-sync-logs', (event, limit = 50) => {
-  try {
-    const logs = db.getSyncLogs(limit);
-    return { success: true, data: logs };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+handle('import-vault', async (password) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Vault',
+    filters: [{ name: 'Xela Vault', extensions: ['xam'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  vaultService.importVaultFrom(result.filePaths[0], password);
+  return result.filePaths[0];
 });

@@ -1,44 +1,66 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose safe IPC methods to React
+// Every method here is a thin wrapper around ipcRenderer.invoke. The
+// renderer never touches Node's fs/crypto directly - all vault access is
+// mediated by the main process (see electron.js + src/services).
 contextBridge.exposeInMainWorld('electron', {
-  // Master Password
+  // ---- master password / vault lifecycle ----
+  // Names kept stable (checkMasterPasswordExists / setMasterPassword /
+  // verifyMasterPassword) so the existing Login screen keeps working
+  // unchanged against the new vault-backed implementation.
+  checkMasterPasswordExists: () => ipcRenderer.invoke('check-master-password-exists'),
   setMasterPassword: (password) => ipcRenderer.invoke('set-master-password', password),
   verifyMasterPassword: (password) => ipcRenderer.invoke('verify-master-password', password),
-  checkMasterPasswordExists: () => ipcRenderer.invoke('check-master-password-exists'),
+  lockVault: () => ipcRenderer.invoke('lock-vault'),
+  changeMasterPassword: (currentPassword, newPassword) =>
+    ipcRenderer.invoke('change-master-password', currentPassword, newPassword),
+  onVaultAutoLocked: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('vault-auto-locked', listener);
+    return () => ipcRenderer.removeListener('vault-auto-locked', listener);
+  },
 
-  // Accounts
-  addAccount: (account) => ipcRenderer.invoke('add-account', account),
-  getAccounts: () => ipcRenderer.invoke('get-accounts'),
-  getAccount: (id) => ipcRenderer.invoke('get-account', id),
-  updateAccount: (id, account) => ipcRenderer.invoke('update-account', id, account),
-  deleteAccount: (id) => ipcRenderer.invoke('delete-account', id),
+  // ---- categories ----
+  getVaultTree: () => ipcRenderer.invoke('get-vault-tree'),
+  addCategory: (name, icon) => ipcRenderer.invoke('add-category', name, icon),
+  renameCategory: (categoryId, name) => ipcRenderer.invoke('rename-category', categoryId, name),
+  deleteCategory: (categoryId) => ipcRenderer.invoke('delete-category', categoryId),
 
-  // Password Strength
-  validatePasswordStrength: (password) => ipcRenderer.invoke('validate-password-strength', password),
+  // ---- folders ----
+  addFolder: (categoryId, parentFolderId, name) =>
+    ipcRenderer.invoke('add-folder', categoryId, parentFolderId, name),
+  renameFolder: (categoryId, folderId, name) => ipcRenderer.invoke('rename-folder', categoryId, folderId, name),
+  deleteFolder: (categoryId, folderId) => ipcRenderer.invoke('delete-folder', categoryId, folderId),
+  moveFolder: (folderId, targetCategoryId, targetParentFolderId) =>
+    ipcRenderer.invoke('move-folder', folderId, targetCategoryId, targetParentFolderId),
 
-  // 2FA
-  enable2FA: (accountId, method, backupCodes) => ipcRenderer.invoke('enable-2fa', accountId, method, backupCodes),
-  disable2FA: (accountId) => ipcRenderer.invoke('disable-2fa', accountId),
-  get2FAStatus: (accountId) => ipcRenderer.invoke('get-2fa-status', accountId),
+  // ---- entries ----
+  addEntry: (categoryId, folderId, entryData) => ipcRenderer.invoke('add-entry', categoryId, folderId, entryData),
+  updateEntry: (entryId, updates) => ipcRenderer.invoke('update-entry', entryId, updates),
+  deleteEntry: (entryId) => ipcRenderer.invoke('delete-entry', entryId),
+  moveEntry: (entryId, targetCategoryId, targetFolderId) =>
+    ipcRenderer.invoke('move-entry', entryId, targetCategoryId, targetFolderId),
+  duplicateEntry: (entryId) => ipcRenderer.invoke('duplicate-entry', entryId),
+  toggleFavorite: (entryId) => ipcRenderer.invoke('toggle-favorite', entryId),
+  listFavorites: () => ipcRenderer.invoke('list-favorites'),
+  listRecentActivity: (limit) => ipcRenderer.invoke('list-recent-activity', limit),
 
-  // Backups
-  createBackup: () => ipcRenderer.invoke('create-backup'),
-  createAutoBackup: () => ipcRenderer.invoke('create-auto-backup'),
-  restoreBackup: (backupData) => ipcRenderer.invoke('restore-backup', backupData),
-  getBackupHistory: (limit) => ipcRenderer.invoke('get-backup-history', limit),
+  // ---- recycle bin ----
+  getRecycleBin: () => ipcRenderer.invoke('get-recycle-bin'),
+  restoreFromRecycleBin: (recycleId) => ipcRenderer.invoke('restore-from-recycle-bin', recycleId),
+  permanentlyDelete: (recycleId) => ipcRenderer.invoke('permanently-delete', recycleId),
+  emptyRecycleBin: () => ipcRenderer.invoke('empty-recycle-bin'),
 
-  // Security
-  getSecurityStats: () => ipcRenderer.invoke('get-security-stats'),
-  getAuditLog: (limit) => ipcRenderer.invoke('get-audit-log', limit),
+  // ---- search ----
+  searchVault: (query) => ipcRenderer.invoke('search-vault', query),
 
-  // Settings
-  getSetting: (key) => ipcRenderer.invoke('get-setting', key),
-  setSetting: (key, value) => ipcRenderer.invoke('set-setting', key, value),
-  getAllSettings: () => ipcRenderer.invoke('get-all-settings'),
+  // ---- settings ----
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  updateSettings: (updates) => ipcRenderer.invoke('update-settings', updates),
 
-  // Sync
-  recordCloudSync: (action, accountId, status, error, provider) =>
-    ipcRenderer.invoke('record-cloud-sync', action, accountId, status, error, provider),
-  getSyncLogs: (limit) => ipcRenderer.invoke('get-sync-logs', limit),
+  // ---- backup / import / export ----
+  listBackups: () => ipcRenderer.invoke('list-backups'),
+  restoreBackup: (backupPath) => ipcRenderer.invoke('restore-backup', backupPath),
+  exportVault: () => ipcRenderer.invoke('export-vault'),
+  importVault: (password) => ipcRenderer.invoke('import-vault', password),
 });
