@@ -117,38 +117,6 @@
   border-radius: 8px;
 }
 
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-secondary {
-  background: #ec4899;
-  color: white;
-  width: 100%;
-}
-
-.btn-secondary:hover {
-  background: #db2777;
-}
-
-.btn-danger {
-  background: #ef4444;
-  color: white;
-  width: 100%;
-}
-
-.btn-danger:hover {
-  background: #dc2626;
-}
-
 .success-message {
   background: #d1fae5;
   color: #065f46;
@@ -166,13 +134,7 @@
 }
 
 .settings-actions .btn-primary {
-  background: #667eea;
-  color: white;
   flex: 1;
-}
-
-.settings-actions .btn-primary:hover {
-  background: #4f46e5;
 }
 
 @media (max-width: 640px) {

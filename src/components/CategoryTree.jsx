@@ -293,7 +293,7 @@ function CategoryTree({
       </div>
 
       <button className="btn btn-outline btn-add-category" onClick={onAddCategory}>
-        New Category
+        <span className="plus-icon">+</span> New Category
       </button>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}

@@ -124,7 +124,11 @@
   border-left: 4px solid #ef4444;
 }
 
-.btn {
+/* Scoped under .login-box (rather than bare .btn/.btn-primary) so these
+   Login-specific sizes/colors can't leak onto .btn-classed elements
+   anywhere else in the app - they used to, since CSS here is otherwise
+   completely unscoped/global. */
+.login-box .btn {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
@@ -134,7 +138,7 @@
   transition: all 0.3s ease;
 }
 
-.btn-large {
+.login-box .btn-large {
   width: 100%;
   padding: 12px;
   font-size: 16px;
@@ -145,22 +149,22 @@
   transition: all 0.3s ease;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.login-box .btn-primary {
+  background: var(--color-primary);
   color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
+.login-box .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px var(--color-active-bg);
 }
 
-.btn-primary:disabled {
+.login-box .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.btn-primary:active:not(:disabled) {
+.login-box .btn-primary:active:not(:disabled) {
   transform: translateY(0);
 }
 
