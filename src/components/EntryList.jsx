@@ -32,6 +32,7 @@ function EntryList({
   hideSearch,
 }) {
   const [revealedFields, setRevealedFields] = useState({});
+  const [activeTag, setActiveTag] = useState(null);
 
   const toggleReveal = (entryId, fieldId) => {
     const key = `${entryId}:${fieldId}`;
@@ -41,6 +42,13 @@ function EntryList({
   const copyToClipboard = (text) => {
     copyWithAutoClear(text, clipboardClearSeconds);
   };
+
+  const allTags = [...new Set(entries.flatMap((e) => e.tags))].sort();
+  // Favorites pinned to the top, otherwise entries keep their existing
+  // order (Array.sort is stable, so this only ever reorders across the
+  // favorite/non-favorite boundary).
+  const sortedEntries = [...entries].sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
+  const visibleEntries = activeTag ? sortedEntries.filter((e) => e.tags.includes(activeTag)) : sortedEntries;
 
   return (
     <div className="account-list-container">
@@ -54,8 +62,22 @@ function EntryList({
             className="search-input"
           />
         )}
-        <span className="account-count">{entries.length} items</span>
+        <span className="account-count">{visibleEntries.length} items</span>
       </div>
+
+      {allTags.length > 0 && (
+        <div className="tag-filter-row">
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              className={`tag-chip ${activeTag === tag ? 'active' : ''}`}
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
 
       {subfolders.length > 0 && (
         <div className="folders-grid">
@@ -74,9 +96,15 @@ function EntryList({
           <p>📭 No entries here</p>
           <p className="hint">Add your first entry to get started</p>
         </div>
-      ) : entries.length === 0 ? null : (
+      ) : visibleEntries.length === 0 ? (
+        activeTag && (
+          <div className="empty-state">
+            <p>No entries tagged "{activeTag}"</p>
+          </div>
+        )
+      ) : (
         <div className="accounts-grid">
-          {entries.map((entry) => (
+          {visibleEntries.map((entry) => (
             <div key={entry.id} className="account-card">
               <div className="card-header">
                 <div className="card-title">
