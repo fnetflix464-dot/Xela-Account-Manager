@@ -630,6 +630,17 @@ describe('settings validation', () => {
     expect(() => svc.updateVaultSettings({ backgroundColor: '#fff' })).toThrow(/hex color/i);
   });
 
+  test('panelColor defaults to null, accepts a valid hex color, and rejects a malformed one', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(svc.getSettings().panelColor).toBeNull();
+
+    const after = svc.updateVaultSettings({ panelColor: '#202020' });
+    expect(after.panelColor).toBe('#202020');
+
+    expect(() => svc.updateVaultSettings({ panelColor: 'blue' })).toThrow(/hex color/i);
+  });
+
   test('backgroundImage defaults to null, accepts a data URI, and rejects non-image values', () => {
     const svc = createTestService();
     svc.create('supersecretpassword');

@@ -275,7 +275,12 @@ function CategoryTree({
 
   return (
     <div className="category-filter">
-      <h3>Categories</h3>
+      <div className="category-filter-header">
+        <h3>Categories</h3>
+        <button className="btn-icon-plus" onClick={onAddCategory} title="New Category">
+          +
+        </button>
+      </div>
       <div className="categories-list">
         {categories.map((category) => (
           <CategoryNode
@@ -291,10 +296,6 @@ function CategoryTree({
           />
         ))}
       </div>
-
-      <button className="btn btn-outline btn-add-category" onClick={onAddCategory}>
-        <span className="plus-icon">+</span> New Category
-      </button>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>

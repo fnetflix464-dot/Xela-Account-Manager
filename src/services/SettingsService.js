@@ -10,6 +10,13 @@ const MAX_BACKUP_COUNT = 100;
 // resize step is ever bypassed.
 const MAX_BACKGROUND_IMAGE_LENGTH = 4 * 1024 * 1024;
 
+function validateHexColor(value, label, example) {
+  if (value === null || typeof value === 'undefined') return;
+  if (typeof value !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(value)) {
+    throw new Error(`${label} must be a 6-digit hex color (e.g. ${example}) or null`);
+  }
+}
+
 /**
  * Validates a fully-resolved Settings object, throwing a clear Error on
  * the first violation found. Mirrors the bounds already enforced by the
@@ -61,16 +68,9 @@ export function validate(settings) {
       throw new Error('Password history limit must be zero (disabled) or greater');
     }
   }
-  if (settings.accentColor !== null && typeof settings.accentColor !== 'undefined') {
-    if (typeof settings.accentColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(settings.accentColor)) {
-      throw new Error('Accent color must be a 6-digit hex color (e.g. #667eea) or null');
-    }
-  }
-  if (settings.backgroundColor !== null && typeof settings.backgroundColor !== 'undefined') {
-    if (typeof settings.backgroundColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(settings.backgroundColor)) {
-      throw new Error('Background color must be a 6-digit hex color (e.g. #f9fafb) or null');
-    }
-  }
+  validateHexColor(settings.accentColor, 'Accent color', '#667eea');
+  validateHexColor(settings.backgroundColor, 'Background color', '#f9fafb');
+  validateHexColor(settings.panelColor, 'Panel color', '#ffffff');
   if (settings.backgroundImage !== null && typeof settings.backgroundImage !== 'undefined') {
     if (typeof settings.backgroundImage !== 'string' || !settings.backgroundImage.startsWith('data:image/')) {
       throw new Error('Background image must be an image data URI or null');

@@ -3,22 +3,30 @@
   padding: 2rem;
   border-radius: 12px;
   box-shadow: var(--shadow-card);
-  max-width: 600px;
+  width: 100%;
+  max-width: 1400px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem 2rem;
+  align-items: start;
+}
+
+.settings-container h2,
+.settings-container > .error-message,
+.settings-container > .success-message,
+.settings-actions {
+  grid-column: 1 / -1;
 }
 
 .settings-container h2 {
-  margin: 0 0 2rem 0;
+  margin: 0;
   color: var(--color-text-primary);
 }
 
 .settings-section {
-  margin-bottom: 2rem;
-  padding-bottom: 2rem;
-  border-bottom: 2px solid var(--color-bg-surface-alt);
-}
-
-.settings-section:last-of-type {
-  border-bottom: none;
+  background: var(--color-bg-surface-alt);
+  padding: 1.25rem 1.5rem;
+  border-radius: 10px;
 }
 
 .settings-section h3 {
@@ -51,7 +59,9 @@
 }
 
 .setting-item select,
-.setting-item input[type="text"] {
+.setting-item input[type="text"],
+.setting-item input[type="number"],
+.setting-item input[type="password"] {
   width: 100%;
   padding: 0.75rem;
   border: 2px solid var(--color-border);
@@ -64,10 +74,12 @@
 }
 
 .setting-item select:focus,
-.setting-item input[type="text"]:focus {
+.setting-item input[type="text"]:focus,
+.setting-item input[type="number"]:focus,
+.setting-item input[type="password"]:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px var(--color-active-bg);
 }
 
 .accent-color-picker {
@@ -128,22 +140,21 @@
 }
 
 .settings-actions {
-  margin-top: 2rem;
   display: flex;
   gap: 1rem;
 }
 
-.settings-actions .btn-primary {
-  flex: 1;
+/* Scoped slimmer buttons for the whole Settings panel - index.css's
+   shared .btn is sized for standalone CTAs, a bit heavy for a form full
+   of them. */
+.settings-container .btn {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 640px) {
   .settings-container {
+    grid-template-columns: 1fr;
     padding: 1.5rem;
-  }
-
-  .settings-section {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
   }
 }

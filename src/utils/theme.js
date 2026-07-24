@@ -74,27 +74,43 @@ function hexToRgba(hex, alpha) {
 const PANEL_OPACITY = 0.88;
 
 /**
- * Makes cards/sidebar/header (--color-bg-surface, --color-bg-surface-alt)
- * a little translucent instead of fully opaque, so a custom background
- * image/color is actually visible behind the UI rather than fully hidden
- * behind it. Only takes effect when `active` is true (a custom background
- * is actually set) - reads the theme's own current color first via
- * getComputedStyle so this works correctly under both light and dark
- * (and doesn't need to know either palette's values itself), then applies
- * an alpha version of exactly that color as an inline override.
+ * Owns --color-bg-surface / --color-bg-surface-alt (cards, sidebar,
+ * header) - the single place that resolves both a custom panel color and
+ * "make panels translucent over a custom background" together, since
+ * they're the same two CSS variables and would otherwise stomp on each
+ * other if applied by two independent functions.
+ *
+ * @param {string|null} panelColor custom panel color override, or null to
+ *   use the active theme's own surface color
+ * @param {boolean} translucent true when a background image/color is set
+ *   elsewhere, so panels should let it show through instead of fully
+ *   hiding it
  */
-export function applyPanelTranslucency(active) {
+export function applySurfaceStyling(panelColor, translucent) {
   const root = document.documentElement;
-  if (!active) {
+  if (!panelColor && !translucent) {
     root.style.removeProperty('--color-bg-surface');
     root.style.removeProperty('--color-bg-surface-alt');
     return;
   }
-  const computed = getComputedStyle(root);
-  const surface = computed.getPropertyValue('--color-bg-surface').trim();
-  const surfaceAlt = computed.getPropertyValue('--color-bg-surface-alt').trim();
-  if (surface.startsWith('#')) root.style.setProperty('--color-bg-surface', hexToRgba(surface, PANEL_OPACITY));
-  if (surfaceAlt.startsWith('#')) {
-    root.style.setProperty('--color-bg-surface-alt', hexToRgba(surfaceAlt, PANEL_OPACITY));
+
+  let surface = panelColor;
+  let surfaceAlt = panelColor ? shade(panelColor, -10) : null;
+  if (!surface) {
+    // No custom panel color - start from whatever the active theme
+    // already resolves to, read via getComputedStyle so this works
+    // correctly under both light and dark without hardcoding either
+    // palette's values here.
+    const computed = getComputedStyle(root);
+    surface = computed.getPropertyValue('--color-bg-surface').trim();
+    surfaceAlt = computed.getPropertyValue('--color-bg-surface-alt').trim();
+  }
+
+  root.style.setProperty('--color-bg-surface', translucent && surface.startsWith('#') ? hexToRgba(surface, PANEL_OPACITY) : surface);
+  if (surfaceAlt) {
+    root.style.setProperty(
+      '--color-bg-surface-alt',
+      translucent && surfaceAlt.startsWith('#') ? hexToRgba(surfaceAlt, PANEL_OPACITY) : surfaceAlt,
+    );
   }
 }

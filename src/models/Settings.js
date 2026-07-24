@@ -43,6 +43,9 @@ export function createSettings(overrides = {}) {
     // Opt-in only, off (null) by default - a base64 data URI (already
     // resized/compressed by the renderer before it ever reaches here).
     backgroundImage: typeof overrides.backgroundImage === 'string' ? overrides.backgroundImage : null,
+    // Same idea again, but for cards/sidebar/header instead of the base
+    // app background.
+    panelColor: typeof overrides.panelColor === 'string' ? overrides.panelColor : null,
   };
 }
 

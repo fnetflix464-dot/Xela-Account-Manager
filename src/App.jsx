@@ -10,7 +10,7 @@ import Settings from './components/Settings';
 import ContextMenu from './components/ContextMenu';
 import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree';
 import { useUndoRedo } from './hooks/useUndoRedo';
-import { applyTheme, applyAccentColor, applyBackgroundColor, applyPanelTranslucency } from './utils/theme';
+import { applyTheme, applyAccentColor, applyBackgroundColor, applySurfaceStyling } from './utils/theme';
 import { entryTemplates } from './data/entryTemplates.js';
 
 const ENTRY_TEMPLATES = entryTemplates.map((t) => t.name);
@@ -140,9 +140,10 @@ function App() {
       applyTheme(preference);
       applyAccentColor(settings ? settings.accentColor : null);
       applyBackgroundColor(settings ? settings.backgroundColor : null);
-      // Depends on the theme's own resolved surface color, so it must run
-      // after applyTheme (above) has set data-theme for this render.
-      applyPanelTranslucency(hasCustomBackground);
+      // Depends on the theme's own resolved surface color when no custom
+      // panel color is set, so it must run after applyTheme (above) has
+      // set data-theme for this render.
+      applySurfaceStyling(settings ? settings.panelColor : null, hasCustomBackground);
     };
     applyAll();
 

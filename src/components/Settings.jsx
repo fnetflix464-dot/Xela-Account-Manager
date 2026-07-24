@@ -2,6 +2,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import '../styles/Settings.css';
 import { resizeImageToDataUrl } from '../utils/imageResize';
 
+function ColorPickerField({ label, value, fallback, onChange, hint }) {
+  return (
+    <div className="setting-item">
+      <label>{label}</label>
+      {hint && <p className="hint">{hint}</p>}
+      <div className="accent-color-picker">
+        <input type="color" value={value || fallback} onChange={(e) => onChange(e.target.value)} />
+        {value && (
+          <button type="button" className="btn-link" onClick={() => onChange(null)}>
+            Reset to default
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Settings({ settings: settingsProp, onSettingsChanged }) {
   // Seeded once from the live (possibly still-unsaved, already-previewed)
   // App-level settings rather than re-fetched from disk on every mount -
@@ -69,17 +86,11 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
     });
   };
 
-  const handleAccentColorChange = (value) => {
+  // Shared by every color-picker setting (accent/background/panel) - all
+  // three live-preview the same way theme does.
+  const handleColorFieldChange = (field, value) => {
     setSettings((prev) => {
-      const next = { ...prev, accentColor: value };
-      onSettingsChanged(next);
-      return next;
-    });
-  };
-
-  const handleBackgroundColorChange = (value) => {
-    setSettings((prev) => {
-      const next = { ...prev, backgroundColor: value };
+      const next = { ...prev, [field]: value };
       onSettingsChanged(next);
       return next;
     });
@@ -263,36 +274,25 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
             <option value="system">System</option>
           </select>
         </div>
-        <div className="setting-item">
-          <label>Accent color</label>
-          <div className="accent-color-picker">
-            <input
-              type="color"
-              value={settings.accentColor || '#667eea'}
-              onChange={(e) => handleAccentColorChange(e.target.value)}
-            />
-            {settings.accentColor && (
-              <button type="button" className="btn-link" onClick={() => handleAccentColorChange(null)}>
-                Reset to default
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="setting-item">
-          <label>Background color</label>
-          <div className="accent-color-picker">
-            <input
-              type="color"
-              value={settings.backgroundColor || '#f9fafb'}
-              onChange={(e) => handleBackgroundColorChange(e.target.value)}
-            />
-            {settings.backgroundColor && (
-              <button type="button" className="btn-link" onClick={() => handleBackgroundColorChange(null)}>
-                Reset to default
-              </button>
-            )}
-          </div>
-        </div>
+        <ColorPickerField
+          label="Accent color"
+          value={settings.accentColor}
+          fallback="#667eea"
+          onChange={(v) => handleColorFieldChange('accentColor', v)}
+        />
+        <ColorPickerField
+          label="Background color"
+          value={settings.backgroundColor}
+          fallback="#f9fafb"
+          onChange={(v) => handleColorFieldChange('backgroundColor', v)}
+        />
+        <ColorPickerField
+          label="Panel color"
+          value={settings.panelColor}
+          fallback="#ffffff"
+          onChange={(v) => handleColorFieldChange('panelColor', v)}
+          hint="Cards, sidebar, and header. Automatically turns a little translucent when a background image/color is set, so it doesn't hide it."
+        />
         <div className="setting-item">
           <label>Background image</label>
           <p className="hint">
