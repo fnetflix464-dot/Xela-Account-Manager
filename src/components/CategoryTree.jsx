@@ -185,6 +185,8 @@ function CategoryTree({
   onSelectFolder,
   onAddCategory,
   onAddFolder,
+  onRenameCategory,
+  onRenameFolder,
   onDeleteCategory,
   onDeleteFolder,
   onMoveFolder,
@@ -213,6 +215,7 @@ function CategoryTree({
     const items = folder
       ? [
           { label: 'New Subfolder', icon: '➕', onClick: () => onAddFolder(categoryId, folder.id) },
+          { label: 'Rename Folder', icon: '✏️', onClick: () => onRenameFolder(categoryId, folder.id, folder.name) },
           {
             label: 'Delete Folder',
             icon: '🗑️',
@@ -222,6 +225,11 @@ function CategoryTree({
         ]
       : [
           { label: 'New Folder', icon: '➕', onClick: () => onAddFolder(categoryId, null) },
+          {
+            label: 'Rename Category',
+            icon: '✏️',
+            onClick: () => onRenameCategory(categoryId, categories.find((c) => c.id === categoryId).name),
+          },
           { label: 'Delete Category', icon: '🗑️', danger: true, onClick: () => onDeleteCategory(categoryId) },
         ];
     setMenu({ x: event.clientX, y: event.clientY, items });

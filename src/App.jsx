@@ -65,8 +65,8 @@ function NewEntryModal({ onCreate, onCancel }) {
 // Electron's renderer does not implement window.prompt() (it throws
 // "prompt() is and will not be supported"), unlike alert()/confirm()
 // which do work - so free-text input needs a real modal instead.
-function PromptModal({ title, placeholder, onSubmit, onCancel }) {
-  const [value, setValue] = useState('');
+function PromptModal({ title, placeholder, initialValue, onSubmit, onCancel }) {
+  const [value, setValue] = useState(initialValue || '');
 
   const submit = () => {
     if (!value.trim()) return;
@@ -87,6 +87,7 @@ function PromptModal({ title, placeholder, onSubmit, onCancel }) {
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
             autoFocus
+            onFocus={(e) => e.target.select()}
             onKeyDown={(e) => {
               if (e.key === 'Enter') submit();
             }}
@@ -253,6 +254,22 @@ function App() {
     });
   };
 
+  const handleRenameCategory = (categoryId, currentName) => {
+    setPromptModal({
+      title: 'Rename category',
+      placeholder: 'e.g. Personal, Work',
+      initialValue: currentName,
+      onSubmit: async (name) => {
+        setPromptModal(null);
+        setLoading(true);
+        const result = await window.electron.renameCategory(categoryId, name);
+        setLoading(false);
+        if (result.success) loadTree();
+        else setError(result.error);
+      },
+    });
+  };
+
   const handleDeleteCategory = async (categoryId) => {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Delete this category and everything in it? It will move to the Recycle Bin.')) return;
@@ -276,6 +293,22 @@ function App() {
         setPromptModal(null);
         setLoading(true);
         const result = await window.electron.addFolder(categoryId, parentFolderId, name);
+        setLoading(false);
+        if (result.success) loadTree();
+        else setError(result.error);
+      },
+    });
+  };
+
+  const handleRenameFolder = (categoryId, folderId, currentName) => {
+    setPromptModal({
+      title: 'Rename folder',
+      placeholder: 'e.g. Documents',
+      initialValue: currentName,
+      onSubmit: async (name) => {
+        setPromptModal(null);
+        setLoading(true);
+        const result = await window.electron.renameFolder(categoryId, folderId, name);
         setLoading(false);
         if (result.success) loadTree();
         else setError(result.error);
@@ -451,6 +484,8 @@ function App() {
               onSelectFolder={handleSelectFolder}
               onAddCategory={handleAddCategory}
               onAddFolder={handleAddFolder}
+              onRenameCategory={handleRenameCategory}
+              onRenameFolder={handleRenameFolder}
               onDeleteCategory={handleDeleteCategory}
               onDeleteFolder={handleDeleteFolder}
               onMoveFolder={handleMoveFolder}
@@ -560,6 +595,7 @@ function App() {
         <PromptModal
           title={promptModal.title}
           placeholder={promptModal.placeholder}
+          initialValue={promptModal.initialValue}
           onSubmit={promptModal.onSubmit}
           onCancel={() => setPromptModal(null)}
         />
