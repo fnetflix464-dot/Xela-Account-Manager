@@ -1,14 +1,5 @@
 import { randomUUID } from 'crypto';
-import { createRequire } from 'module';
-
-// `createRequire` (rather than `import ... with { type: 'json' }`) reads
-// the JSON - CJS `require()` has always supported `.json` natively, and
-// unlike the ESM import-attributes syntax it isn't sensitive to the exact
-// Node minor version. Kept in sync with src/components/EntryForm.jsx,
-// which imports the same file directly (webpack supports JSON imports
-// natively there).
-const require = createRequire(import.meta.url);
-const fieldTypes = require('../data/fieldTypes.json');
+import { fieldTypes } from '../data/fieldTypes.js';
 
 // Field types supported across all entry templates.
 export const FIELD_TYPES = Object.freeze(fieldTypes.types);

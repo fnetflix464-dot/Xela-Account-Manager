@@ -1,12 +1,6 @@
 import { randomUUID } from 'crypto';
-import { createRequire } from 'module';
 import { createField } from './Field.js';
-
-// See Field.js for why `createRequire` is used to read this JSON rather
-// than an ESM import-attributes import. Kept in sync with
-// src/App.jsx/EntryList.jsx, which import the same file directly.
-const require = createRequire(import.meta.url);
-const entryTemplates = require('../data/entryTemplates.json');
+import { entryTemplates } from '../data/entryTemplates.js';
 
 // Built-in entry templates. "Custom" has no default fields.
 export const ENTRY_TEMPLATES = Object.freeze(entryTemplates.map((t) => t.name));

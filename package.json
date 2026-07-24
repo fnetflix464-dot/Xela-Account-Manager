@@ -29,10 +29,13 @@
     "react-build": "react-scripts build",
     "electron-start": "electron public/electron.js",
     "start": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && npm run electron-start\"",
+    "test": "react-scripts test --watchAll=false",
+    "test:watch": "react-scripts test",
     "build": "npm run react-build && electron-builder",
     "dist": "npm run react-build && electron-builder --publish never"
   },
   "build": {
+    "extends": null,
     "appId": "com.xela.accountmanager",
     "productName": "Xela Account Manager",
     "files": [
@@ -44,6 +47,7 @@
       "src/repositories/**/*",
       "src/commands/**/*",
       "src/data/**/*",
+      "!src/**/*.test.js",
       "node_modules/**/*"
     ],
     "directories": {

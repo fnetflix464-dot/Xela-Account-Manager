@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../styles/AccountList.css';
-import entryTemplates from '../data/entryTemplates.json';
+import { entryTemplates } from '../data/entryTemplates.js';
 import { copyWithAutoClear } from '../utils/clipboard';
 
 const TEMPLATE_EMOJI = Object.fromEntries(entryTemplates.map((t) => [t.name, t.emoji]));

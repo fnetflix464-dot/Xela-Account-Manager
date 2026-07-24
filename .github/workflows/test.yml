@@ -32,7 +32,6 @@ jobs:
       
       - name: Run tests
         run: npm test --if-present
-        continue-on-error: true
       
       - name: Build React app
         run: npm run react-build

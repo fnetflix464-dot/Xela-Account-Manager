@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import '../styles/AccountForm.css';
 import { calculatePasswordStrength } from '../utils/passwordStrength';
 import { generatePassword } from '../utils/passwordGenerator';
-import fieldTypes from '../data/fieldTypes.json';
+import { fieldTypes } from '../data/fieldTypes.js';
 
 const FIELD_TYPES = fieldTypes.types;
 const AUTO_HIDDEN_TYPES = fieldTypes.autoHidden;

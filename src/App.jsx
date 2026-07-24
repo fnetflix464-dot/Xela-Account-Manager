@@ -10,7 +10,7 @@ import Settings from './components/Settings';
 import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { applyTheme } from './utils/theme';
-import entryTemplates from './data/entryTemplates.json';
+import { entryTemplates } from './data/entryTemplates.js';
 
 const ENTRY_TEMPLATES = entryTemplates.map((t) => t.name);
 

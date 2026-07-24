@@ -72,7 +72,10 @@ export function decrypt(payload, key) {
     throw new Error('Decryption key must be a 32-byte Buffer');
   }
   const { iv, authTag, ciphertext } = payload || {};
-  if (!iv || !authTag || !ciphertext) {
+  // Presence checks, not truthiness checks: encrypting an empty string
+  // legitimately produces an empty (falsy) base64 ciphertext, which a
+  // `!ciphertext` check would wrongly reject as "malformed".
+  if (iv === undefined || authTag === undefined || ciphertext === undefined) {
     throw new Error('Malformed encrypted payload');
   }
 
