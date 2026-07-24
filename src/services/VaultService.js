@@ -53,7 +53,18 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     }
   }
 
+  // Node Buffers aren't zeroed on assignment - dropping the last reference
+  // just makes the key material eligible for GC, but until that runs the
+  // raw key bytes sit in the heap (and are a candidate for paging to disk)
+  // for an indeterminate amount of time. Overwriting in place bounds that
+  // window to "immediately".
+  function wipeKeyMaterial() {
+    if (sessionKey) sessionKey.fill(0);
+    if (salt) salt.fill(0);
+  }
+
   function lock() {
+    wipeKeyMaterial();
     sessionKey = null;
     salt = null;
     vault = null;
@@ -141,6 +152,7 @@ export function createVaultService({ vaultFilePath, backupDir }) {
       throw new Error('New master password must be at least 8 characters');
     }
     const { sessionKey: newKey, salt: newSalt } = VaultRepository.deriveNewKey(newPassword);
+    wipeKeyMaterial();
     salt = newSalt;
     sessionKey = newKey;
     vault = logActivity(touchVault(vault), 'vault.masterPasswordChanged');
@@ -590,6 +602,7 @@ export function createVaultService({ vaultFilePath, backupDir }) {
 
     VaultRepository.replaceLiveFile(sourcePath, vaultFilePath, backupDir, decrypted.settings.backupCount || 10);
 
+    wipeKeyMaterial();
     salt = newSalt;
     sessionKey = newKey;
     vault = logActivity(touchVault(decrypted), 'vault.imported');

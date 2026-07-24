@@ -4,6 +4,7 @@ import path from 'path';
 import { createVaultService } from './VaultService.js';
 import { eventBus, VAULT_EVENT_CHANNEL } from './EventBus.js';
 import * as VaultRepository from '../repositories/VaultRepository.js';
+import * as CryptoService from './CryptoService.js';
 
 function createTestService() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xela-vs-test-'));
@@ -67,6 +68,35 @@ describe('vault lifecycle', () => {
     expect(() => svc.unlock('old-password-123')).toThrow();
     svc.unlock('new-password-123');
     expect(svc.isUnlocked()).toBe(true);
+  });
+});
+
+describe('key material hygiene', () => {
+  test('lock() zeroes the in-memory session key Buffer rather than just dropping the reference', () => {
+    const svc = createTestService();
+    const deriveKeySpy = jest.spyOn(CryptoService, 'deriveKey');
+
+    svc.create('supersecretpassword');
+    const keyBuffer = deriveKeySpy.mock.results[0].value;
+    expect(keyBuffer.some((byte) => byte !== 0)).toBe(true); // sanity: real derived key, not already blank
+
+    svc.lock();
+    expect(keyBuffer.every((byte) => byte === 0)).toBe(true);
+
+    deriveKeySpy.mockRestore();
+  });
+
+  test('changeMasterPassword() zeroes the outgoing key Buffer, not just the new one', () => {
+    const svc = createTestService();
+    const deriveKeySpy = jest.spyOn(CryptoService, 'deriveKey');
+
+    svc.create('old-password-123');
+    const oldKeyBuffer = deriveKeySpy.mock.results[0].value;
+
+    svc.changeMasterPassword('old-password-123', 'new-password-123');
+    expect(oldKeyBuffer.every((byte) => byte === 0)).toBe(true);
+
+    deriveKeySpy.mockRestore();
   });
 });
 
