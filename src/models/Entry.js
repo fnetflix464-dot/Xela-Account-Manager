@@ -1,87 +1,30 @@
-const { randomUUID } = require('crypto');
-const { createField } = require('./Field');
+import { randomUUID } from 'crypto';
+import { createRequire } from 'module';
+import { createField } from './Field.js';
+
+// See Field.js for why `createRequire` is used to read this JSON rather
+// than an ESM import-attributes import. Kept in sync with
+// src/App.jsx/EntryList.jsx, which import the same file directly.
+const require = createRequire(import.meta.url);
+const entryTemplates = require('../data/entryTemplates.json');
 
 // Built-in entry templates. "Custom" has no default fields.
-const ENTRY_TEMPLATES = Object.freeze([
-  'Login',
-  'Secure Note',
-  'Credit Card',
-  'Bank Account',
-  'License Key',
-  'API Key',
-  'SSH Key',
-  'WiFi',
-  'Custom',
-]);
+export const ENTRY_TEMPLATES = Object.freeze(entryTemplates.map((t) => t.name));
 
-const TEMPLATE_ICONS = Object.freeze({
-  Login: 'key',
-  'Secure Note': 'note',
-  'Credit Card': 'credit-card',
-  'Bank Account': 'bank',
-  'License Key': 'tag',
-  'API Key': 'code',
-  'SSH Key': 'terminal',
-  WiFi: 'wifi',
-  Custom: 'file',
-});
+export const TEMPLATE_ICONS = Object.freeze(
+  Object.fromEntries(entryTemplates.map((t) => [t.name, t.icon])),
+);
+
+const DEFAULT_FIELDS_BY_TEMPLATE = Object.fromEntries(entryTemplates.map((t) => [t.name, t.fields]));
 
 /**
  * Returns the default field set for a given template. Pure/no side effects
  * beyond generating fresh field ids/timestamps.
  */
-function defaultFieldsForTemplate(template) {
-  switch (template) {
-    case 'Login':
-      return [
-        createField({ label: 'Username', type: 'text' }),
-        createField({ label: 'Password', type: 'password' }),
-        createField({ label: 'Website', type: 'url' }),
-      ];
-    case 'Secure Note':
-      return [createField({ label: 'Note', type: 'note' })];
-    case 'Credit Card':
-      return [
-        createField({ label: 'Cardholder Name', type: 'text' }),
-        createField({ label: 'Card Number', type: 'password' }),
-        createField({ label: 'Expiry Date', type: 'text' }),
-        createField({ label: 'CVV', type: 'pin' }),
-        createField({ label: 'PIN', type: 'pin' }),
-      ];
-    case 'Bank Account':
-      return [
-        createField({ label: 'Bank Name', type: 'text' }),
-        createField({ label: 'Account Number', type: 'password' }),
-        createField({ label: 'Routing Number', type: 'text' }),
-        createField({ label: 'IBAN', type: 'text' }),
-      ];
-    case 'License Key':
-      return [
-        createField({ label: 'Product', type: 'text' }),
-        createField({ label: 'License Key', type: 'password' }),
-      ];
-    case 'API Key':
-      return [
-        createField({ label: 'Service', type: 'text' }),
-        createField({ label: 'API Key', type: 'password' }),
-        createField({ label: 'API Secret', type: 'password' }),
-      ];
-    case 'SSH Key':
-      return [
-        createField({ label: 'Host', type: 'text' }),
-        createField({ label: 'Username', type: 'text' }),
-        createField({ label: 'Private Key', type: 'note' }),
-        createField({ label: 'Passphrase', type: 'password' }),
-      ];
-    case 'WiFi':
-      return [
-        createField({ label: 'Network Name (SSID)', type: 'text' }),
-        createField({ label: 'Password', type: 'password' }),
-      ];
-    case 'Custom':
-    default:
-      return [];
-  }
+export function defaultFieldsForTemplate(template) {
+  const fields = DEFAULT_FIELDS_BY_TEMPLATE[template];
+  if (!fields) return [];
+  return fields.map((f) => createField({ label: f.label, type: f.type }));
 }
 
 /**
@@ -89,7 +32,7 @@ function defaultFieldsForTemplate(template) {
  * all sensitive data lives inside `fields`.
  * @param {Object} options
  */
-function createEntry({
+export function createEntry({
   title,
   template = 'Custom',
   icon,
@@ -121,7 +64,7 @@ function createEntry({
   };
 }
 
-function updateEntry(entry, updates = {}) {
+export function updateEntry(entry, updates = {}) {
   if (updates.template && !ENTRY_TEMPLATES.includes(updates.template)) {
     throw new Error(`Invalid entry template: ${updates.template}`);
   }
@@ -135,7 +78,7 @@ function updateEntry(entry, updates = {}) {
   return next;
 }
 
-function duplicateEntry(entry) {
+export function duplicateEntry(entry) {
   const now = new Date().toISOString();
   return {
     ...entry,
@@ -147,7 +90,7 @@ function duplicateEntry(entry) {
   };
 }
 
-function isEntryValid(entry) {
+export function isEntryValid(entry) {
   return (
     !!entry &&
     typeof entry.id === 'string' &&
@@ -156,13 +99,3 @@ function isEntryValid(entry) {
     Array.isArray(entry.fields)
   );
 }
-
-module.exports = {
-  ENTRY_TEMPLATES,
-  TEMPLATE_ICONS,
-  defaultFieldsForTemplate,
-  createEntry,
-  updateEntry,
-  duplicateEntry,
-  isEntryValid,
-};

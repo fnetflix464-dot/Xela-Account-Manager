@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
 import '../styles/AccountList.css';
+import entryTemplates from '../data/entryTemplates.json';
+import { copyWithAutoClear } from '../utils/clipboard';
 
-const TEMPLATE_EMOJI = {
-  Login: '🔑',
-  'Secure Note': '📝',
-  'Credit Card': '💳',
-  'Bank Account': '🏦',
-  'License Key': '🏷️',
-  'API Key': '💻',
-  'SSH Key': '🖥️',
-  WiFi: '📶',
-  Custom: '📄',
-};
+const TEMPLATE_EMOJI = Object.fromEntries(entryTemplates.map((t) => [t.name, t.emoji]));
+const FOLDER_EMOJI = '📁';
 
-function EntryList({ entries, searchTerm, onSearchTermChange, onEdit, onDelete, onDuplicate, onToggleFavorite }) {
+function countEntriesRecursive(folder) {
+  return folder.entries.length + folder.folders.reduce((sum, f) => sum + countEntriesRecursive(f), 0);
+}
+
+function EntryList({
+  entries,
+  subfolders,
+  onOpenFolder,
+  searchTerm,
+  onSearchTermChange,
+  onEdit,
+  onDelete,
+  onDuplicate,
+  onToggleFavorite,
+  clipboardClearSeconds,
+}) {
   const [revealedFields, setRevealedFields] = useState({});
 
   const toggleReveal = (entryId, fieldId) => {
@@ -22,7 +30,7 @@ function EntryList({ entries, searchTerm, onSearchTermChange, onEdit, onDelete, 
   };
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text || '');
+    copyWithAutoClear(text, clipboardClearSeconds);
   };
 
   return (
@@ -38,12 +46,24 @@ function EntryList({ entries, searchTerm, onSearchTermChange, onEdit, onDelete, 
         <span className="account-count">{entries.length} items</span>
       </div>
 
-      {entries.length === 0 ? (
+      {subfolders.length > 0 && (
+        <div className="folders-grid">
+          {subfolders.map((folder) => (
+            <button key={folder.id} className="folder-tile" onClick={() => onOpenFolder(folder.id)}>
+              <span className="folder-tile-emoji">{FOLDER_EMOJI}</span>
+              <span className="folder-tile-name">{folder.name}</span>
+              <span className="folder-tile-count">{countEntriesRecursive(folder)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {entries.length === 0 && subfolders.length === 0 ? (
         <div className="empty-state">
           <p>📭 No entries here</p>
           <p className="hint">Add your first entry to get started</p>
         </div>
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="accounts-grid">
           {entries.map((entry) => (
             <div key={entry.id} className="account-card">

@@ -13,20 +13,22 @@
 .search-input {
   flex: 1;
   padding: 0.75rem 1rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   font-size: 1rem;
   transition: all 0.3s ease;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .account-count {
-  background: #667eea;
+  background: var(--color-primary);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -34,10 +36,54 @@
   white-space: nowrap;
 }
 
+.folders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.folder-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.folder-tile:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+
+.folder-tile-emoji {
+  font-size: 1.25rem;
+}
+
+.folder-tile-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-tile-count {
+  color: var(--color-text-faint);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .empty-state {
   text-align: center;
   padding: 3rem 2rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .empty-state p {
@@ -46,7 +92,7 @@
 
 .empty-state p.hint {
   font-size: 0.9rem;
-  color: #9ca3af;
+  color: var(--color-text-faint);
 }
 
 .accounts-grid {
@@ -56,17 +102,17 @@
 }
 
 .account-card {
-  background: white;
+  background: var(--color-bg-surface);
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-card);
   transition: all 0.3s ease;
   border: 2px solid transparent;
 }
 
 .account-card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: #667eea;
+  border-color: var(--color-primary);
   transform: translateY(-4px);
 }
 
@@ -75,7 +121,7 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 1rem;
-  border-bottom: 2px solid #f3f4f6;
+  border-bottom: 2px solid var(--color-bg-surface-alt);
   padding-bottom: 1rem;
 }
 
@@ -87,7 +133,7 @@
 
 .card-title h4 {
   margin: 0;
-  color: #1f2937;
+  color: var(--color-text-primary);
   font-size: 1.1rem;
 }
 
@@ -96,8 +142,8 @@
 }
 
 .category-badge {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--color-bg-surface-alt);
+  color: var(--color-text-muted);
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.85rem;
@@ -120,13 +166,13 @@
 
 .account-field label {
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--color-text-faint);
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .account-field span {
-  color: #374151;
+  color: var(--color-text-secondary);
   font-weight: 500;
   word-break: break-all;
 }
@@ -140,9 +186,10 @@
 .password-display input {
   flex: 1;
   padding: 0.5rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: #f9fafb;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
   font-weight: 600;
   cursor: not-allowed;
 }
@@ -152,9 +199,9 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: white;
+  background: var(--color-bg-surface);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -165,8 +212,8 @@
 
 .btn-reveal:hover,
 .btn-copy:hover {
-  background: #f3f4f6;
-  border-color: #667eea;
+  background: var(--color-bg-surface-alt);
+  border-color: var(--color-primary);
 }
 
 .strength-badge {
@@ -213,12 +260,12 @@
 }
 
 .btn-primary {
-  background: #667eea;
+  background: var(--color-primary);
   color: white;
 }
 
 .btn-primary:hover {
-  background: #4f46e5;
+  background: var(--color-primary-hover);
 }
 
 .btn-success {

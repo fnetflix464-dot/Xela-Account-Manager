@@ -4,8 +4,10 @@ import { calculatePasswordStrength } from '../utils/passwordStrength';
 
 function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState('verify');
+  const [mode, setMode] = useState('verify'); // 'setup' | 'verify' | 'import'
+  const [previousMode, setPreviousMode] = useState('setup'); // where 'import' returns to on Back
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [importPassword, setImportPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [passwordStrength, setPasswordStrength] = useState('');
@@ -55,7 +57,7 @@ function Login({ onLoginSuccess }) {
     try {
       setLoading(true);
       const result = await window.electron.setMasterPassword(password);
-      
+
       if (result.success) {
         onLoginSuccess();
       } else {
@@ -80,12 +82,49 @@ function Login({ onLoginSuccess }) {
     try {
       setLoading(true);
       const result = await window.electron.verifyMasterPassword(password);
-      
+
       if (result.success) {
         onLoginSuccess();
       } else {
         setError('Invalid master password');
         setPassword('');
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportVault = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!importPassword) {
+      setError('Enter the master password of the vault file you want to import');
+      return;
+    }
+
+    if (
+      previousMode === 'verify' &&
+      // eslint-disable-next-line no-alert
+      !window.confirm('Importing will replace your current vault (a backup of it will be kept first). Continue?')
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Shows a native "choose file" dialog, then decrypts + adopts it as
+      // the live vault - already unlocked in memory on success, so no
+      // separate "unlock" step is needed afterwards.
+      const result = await window.electron.importVault(importPassword);
+      if (result.success && result.data) {
+        onLoginSuccess();
+      } else if (result.success && !result.data) {
+        // User canceled the file picker - stay on this screen.
+      } else {
+        setError(result.error || 'Failed to import vault');
       }
     } catch (err) {
       setError(err.message || 'An error occurred');
@@ -115,6 +154,61 @@ function Login({ onLoginSuccess }) {
         <div className="login-box">
           <div className="spinner"></div>
           <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'import') {
+    return (
+      <div className="login-container">
+        <div className="login-box">
+          <div className="login-header">
+            <h1>🔐 Xela Account Manager</h1>
+            <p>Import an Existing Vault</p>
+          </div>
+
+          <form onSubmit={handleImportVault}>
+            <div className="form-group">
+              <label htmlFor="import-password">Master password of the vault file to import</label>
+              <input
+                id="import-password"
+                type="password"
+                value={importPassword}
+                onChange={(e) => setImportPassword(e.target.value)}
+                placeholder="Enter that vault's master password"
+                disabled={loading}
+                autoFocus
+                required
+              />
+            </div>
+
+            {error && <div className="error-message">{error}</div>}
+
+            <button type="submit" className="btn btn-primary btn-large" disabled={loading}>
+              {loading ? 'Processing...' : '📂 Choose File & Import'}
+            </button>
+          </form>
+
+          <div className="login-footer">
+            <p>
+              {previousMode === 'verify'
+                ? 'This replaces your current vault (it gets backed up first). '
+                : ''}
+              You'll be asked to pick the .xam file next.
+            </p>
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                setError('');
+                setImportPassword('');
+                setMode(previousMode);
+              }}
+            >
+              ← Back
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -194,6 +288,17 @@ function Login({ onLoginSuccess }) {
               ? '🔒 This is your one-time setup. Create a strong password to protect your accounts.'
               : '🔑 Enter your master password to access your accounts.'}
           </p>
+          <button
+            type="button"
+            className="btn-link"
+            onClick={() => {
+              setError('');
+              setPreviousMode(mode);
+              setMode('import');
+            }}
+          >
+            {mode === 'setup' ? '📂 Import an existing vault instead' : '📂 Import a different vault'}
+          </button>
         </div>
       </div>
     </div>

@@ -1,11 +1,11 @@
-const { randomUUID } = require('crypto');
+import { randomUUID } from 'crypto';
 
 /**
  * Creates a Folder. Folders can nest other folders without limit and hold
  * Entry objects directly.
  * @param {Object} options
  */
-function createFolder({ name, icon = 'folder', folders = [], entries = [] } = {}) {
+export function createFolder({ name, icon = 'folder', folders = [], entries = [] } = {}) {
   if (!name || typeof name !== 'string') {
     throw new Error('Folder requires a non-empty name');
   }
@@ -21,7 +21,7 @@ function createFolder({ name, icon = 'folder', folders = [], entries = [] } = {}
   };
 }
 
-function updateFolder(folder, updates = {}) {
+export function updateFolder(folder, updates = {}) {
   return {
     ...folder,
     ...updates,
@@ -29,7 +29,7 @@ function updateFolder(folder, updates = {}) {
   };
 }
 
-function isFolderValid(folder) {
+export function isFolderValid(folder) {
   return (
     !!folder &&
     typeof folder.id === 'string' &&
@@ -43,7 +43,7 @@ function isFolderValid(folder) {
  * Recursively walks a folder tree, invoking visitor(node, path) for the
  * folder itself and every descendant folder. Read-only traversal.
  */
-function walkFolders(folder, visitor, path = []) {
+export function walkFolders(folder, visitor, path = []) {
   visitor(folder, path);
   for (const child of folder.folders) {
     walkFolders(child, visitor, [...path, folder.id]);
@@ -54,7 +54,7 @@ function walkFolders(folder, visitor, path = []) {
  * Finds a folder by id anywhere within a folder tree (inclusive of root).
  * Returns null if not found.
  */
-function findFolderById(rootFolder, folderId) {
+export function findFolderById(rootFolder, folderId) {
   if (rootFolder.id === folderId) return rootFolder;
   for (const child of rootFolder.folders) {
     const found = findFolderById(child, folderId);
@@ -67,7 +67,7 @@ function findFolderById(rootFolder, folderId) {
  * Finds the parent folder of a given folder id within a tree.
  * Returns null if folderId is the root or not found.
  */
-function findParentFolder(rootFolder, folderId) {
+export function findParentFolder(rootFolder, folderId) {
   for (const child of rootFolder.folders) {
     if (child.id === folderId) return rootFolder;
     const found = findParentFolder(child, folderId);
@@ -75,12 +75,3 @@ function findParentFolder(rootFolder, folderId) {
   }
   return null;
 }
-
-module.exports = {
-  createFolder,
-  updateFolder,
-  isFolderValid,
-  walkFolders,
-  findFolderById,
-  findParentFolder,
-};

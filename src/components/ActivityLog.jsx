@@ -7,7 +7,7 @@ function formatAction(entry) {
   return name ? `${label} — ${name}` : label;
 }
 
-function SecurityDashboard() {
+function ActivityLog() {
   const [tree, setTree] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [recycleBinCount, setRecycleBinCount] = useState(0);
@@ -94,4 +94,4 @@ function SecurityDashboard() {
   );
 }
 
-export default SecurityDashboard;
+export default ActivityLog;

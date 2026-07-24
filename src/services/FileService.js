@@ -1,12 +1,12 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
-const VAULT_FILE_VERSION = 1;
+export const VAULT_FILE_VERSION = 1;
 
 /**
  * Returns true if a path exists on disk.
  */
-function pathExists(filePath) {
+export function pathExists(filePath) {
   try {
     fs.accessSync(filePath, fs.constants.F_OK);
     return true;
@@ -18,7 +18,7 @@ function pathExists(filePath) {
 /**
  * Ensures a directory exists, creating it (and parents) if necessary.
  */
-function ensureDir(dirPath) {
+export function ensureDir(dirPath) {
   if (!pathExists(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
@@ -31,7 +31,7 @@ function ensureDir(dirPath) {
  * @param {string} filePath
  * @returns {{ fileVersion: number, salt: string, iv: string, authTag: string, ciphertext: string }}
  */
-function readVaultFile(filePath) {
+export function readVaultFile(filePath) {
   if (!pathExists(filePath)) {
     throw new Error(`Vault file not found: ${filePath}`);
   }
@@ -55,7 +55,7 @@ function readVaultFile(filePath) {
  * @param {string} filePath
  * @param {{ salt: string, iv: string, authTag: string, ciphertext: string }} envelope
  */
-function writeVaultFile(filePath, envelope) {
+export function writeVaultFile(filePath, envelope) {
   ensureDir(path.dirname(filePath));
 
   const payload = {
@@ -75,7 +75,7 @@ function writeVaultFile(filePath, envelope) {
 /**
  * Copies a file (used for backups and export). Overwrites destination.
  */
-function copyFile(sourcePath, destPath) {
+export function copyFile(sourcePath, destPath) {
   ensureDir(path.dirname(destPath));
   fs.copyFileSync(sourcePath, destPath);
 }
@@ -84,7 +84,7 @@ function copyFile(sourcePath, destPath) {
  * Lists files in a directory matching a prefix, sorted oldest-to-newest
  * by mtime. Returns absolute paths. Missing directory yields [].
  */
-function listFilesByPrefix(dirPath, prefix) {
+export function listFilesByPrefix(dirPath, prefix) {
   if (!pathExists(dirPath)) return [];
   return fs
     .readdirSync(dirPath)
@@ -93,19 +93,8 @@ function listFilesByPrefix(dirPath, prefix) {
     .sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
 }
 
-function deleteFile(filePath) {
+export function deleteFile(filePath) {
   if (pathExists(filePath)) {
     fs.unlinkSync(filePath);
   }
 }
-
-module.exports = {
-  VAULT_FILE_VERSION,
-  pathExists,
-  ensureDir,
-  readVaultFile,
-  writeVaultFile,
-  copyFile,
-  listFilesByPrefix,
-  deleteFile,
-};

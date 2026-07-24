@@ -1,6 +1,6 @@
-const THEMES = Object.freeze(['light', 'dark', 'system']);
+export const THEMES = Object.freeze(['light', 'dark', 'system']);
 
-const DEFAULT_PASSWORD_GENERATOR_SETTINGS = Object.freeze({
+export const DEFAULT_PASSWORD_GENERATOR_SETTINGS = Object.freeze({
   length: 20,
   uppercase: true,
   lowercase: true,
@@ -14,7 +14,7 @@ const DEFAULT_PASSWORD_GENERATOR_SETTINGS = Object.freeze({
  * the Vault and are persisted with everything else.
  * @param {Object} [overrides]
  */
-function createSettings(overrides = {}) {
+export function createSettings(overrides = {}) {
   return {
     theme: THEMES.includes(overrides.theme) ? overrides.theme : 'system',
     autoLockMinutes:
@@ -26,10 +26,17 @@ function createSettings(overrides = {}) {
     },
     recentFileLimit:
       typeof overrides.recentFileLimit === 'number' ? overrides.recentFileLimit : 10,
+    // 0 disables auto-clear. Default of 20s balances usability (enough
+    // time to paste) against a copied password lingering indefinitely.
+    clipboardClearSeconds:
+      typeof overrides.clipboardClearSeconds === 'number' ? overrides.clipboardClearSeconds : 20,
+    // 0 disables history entirely (no past values retained).
+    passwordHistoryLimit:
+      typeof overrides.passwordHistoryLimit === 'number' ? overrides.passwordHistoryLimit : 20,
   };
 }
 
-function updateSettings(settings, updates = {}) {
+export function updateSettings(settings, updates = {}) {
   return {
     ...settings,
     ...updates,
@@ -39,10 +46,3 @@ function updateSettings(settings, updates = {}) {
     },
   };
 }
-
-module.exports = {
-  THEMES,
-  DEFAULT_PASSWORD_GENERATOR_SETTINGS,
-  createSettings,
-  updateSettings,
-};

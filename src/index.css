@@ -1,3 +1,62 @@
+/* Theme tokens - :root is the light (default) palette, overridden by
+   :root[data-theme="dark"] (see src/utils/theme.js for how/when that
+   attribute gets set - it defaults to the OS preference pre-login, since
+   the "theme" setting itself lives inside the encrypted vault and isn't
+   readable until unlocked). Brand accents (the purple header/login
+   gradient, semantic success/warning/danger colors) are intentionally
+   left as literals throughout the other stylesheets - they already read
+   fine on both backgrounds. Only "chrome" (page/card backgrounds, body
+   text, borders) is themed. */
+:root {
+  --color-bg-app: #f9fafb;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-alt: #f3f4f6;
+  --color-bg-subtle: #f9fafb;
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-text-faint: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-primary: #667eea;
+  --color-primary-hover: #4f46e5;
+  --color-active-bg: rgba(102, 126, 234, 0.12);
+  --color-badge-bg: rgba(0, 0, 0, 0.1);
+  --color-danger-bg: #fee2e2;
+  --color-danger-text: #991b1b;
+  --color-danger-border: #ef4444;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.3);
+  --scrollbar-track: #f3f4f6;
+  --scrollbar-thumb: #d1d5db;
+  --scrollbar-thumb-hover: #9ca3af;
+}
+
+:root[data-theme='dark'] {
+  --color-bg-app: #0f172a;
+  --color-bg-surface: #1e293b;
+  --color-bg-surface-alt: #27334a;
+  --color-bg-subtle: #1a2436;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-faint: #64748b;
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-primary: #818cf8;
+  --color-primary-hover: #6366f1;
+  --color-active-bg: rgba(129, 140, 248, 0.2);
+  --color-badge-bg: rgba(255, 255, 255, 0.12);
+  --color-danger-bg: #450a0a;
+  --color-danger-text: #fca5a5;
+  --color-danger-border: #f87171;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --scrollbar-track: #1e293b;
+  --scrollbar-thumb: #475569;
+  --scrollbar-thumb-hover: #64748b;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -16,8 +75,9 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f9fafb;
-  color: #1f2937;
+  background: var(--color-bg-app);
+  color: var(--color-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 code {
@@ -37,16 +97,16 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f3f4f6;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Shared button primitives used across components (App, EntryList,
@@ -64,7 +124,7 @@ code {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: #667eea;
+  background: var(--color-primary);
   color: white;
 }
 
@@ -84,12 +144,12 @@ code {
 
 .btn-outline {
   background: transparent;
-  border-color: #d1d5db;
-  color: #374151;
+  border-color: var(--color-border-strong);
+  color: var(--color-text-secondary);
 }
 
 .btn-outline:hover {
-  background: #f3f4f6;
+  background: var(--color-bg-surface-alt);
 }
 
 .btn-success {
@@ -107,5 +167,5 @@ code {
 .loading-state {
   text-align: center;
   padding: 3rem 2rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }

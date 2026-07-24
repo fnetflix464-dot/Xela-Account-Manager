@@ -5,21 +5,14 @@ import CategoryTree from './components/CategoryTree';
 import EntryList from './components/EntryList';
 import EntryForm from './components/EntryForm';
 import RecycleBin from './components/RecycleBin';
-import ActivityLog from './components/SecurityDashboard';
+import ActivityLog from './components/ActivityLog';
 import Settings from './components/Settings';
-import { findCategory, findFolder, collectEntries, collectCategoryEntries } from './utils/vaultTree';
+import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree';
+import { useUndoRedo } from './hooks/useUndoRedo';
+import { applyTheme } from './utils/theme';
+import entryTemplates from './data/entryTemplates.json';
 
-const ENTRY_TEMPLATES = [
-  'Login',
-  'Secure Note',
-  'Credit Card',
-  'Bank Account',
-  'License Key',
-  'API Key',
-  'SSH Key',
-  'WiFi',
-  'Custom',
-];
+const ENTRY_TEMPLATES = entryTemplates.map((t) => t.name);
 
 function NewEntryModal({ onCreate, onCancel }) {
   const [template, setTemplate] = useState('Login');
@@ -69,6 +62,49 @@ function NewEntryModal({ onCreate, onCancel }) {
   );
 }
 
+// Electron's renderer does not implement window.prompt() (it throws
+// "prompt() is and will not be supported"), unlike alert()/confirm()
+// which do work - so free-text input needs a real modal instead.
+function PromptModal({ title, placeholder, onSubmit, onCancel }) {
+  const [value, setValue] = useState('');
+
+  const submit = () => {
+    if (!value.trim()) return;
+    onSubmit(value.trim());
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <button className="modal-close" onClick={onCancel}>
+          ✕
+        </button>
+        <h3>{title}</h3>
+        <div className="form-group">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={placeholder}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submit();
+            }}
+          />
+        </div>
+        <div className="form-actions">
+          <button className="btn btn-outline" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" disabled={!value.trim()} onClick={submit}>
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -79,11 +115,37 @@ function App() {
   const [searchResults, setSearchResults] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [showNewEntryModal, setShowNewEntryModal] = useState(false);
+  const [promptModal, setPromptModal] = useState(null); // { title, placeholder, onSubmit } | null
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const clearError = () => setError('');
+
+  // Applies the theme setting to the whole app, including the Login
+  // screen: settings live inside the encrypted vault, so pre-auth (or on
+  // a fresh install before any setting exists) this falls back to the OS
+  // preference. Only tracks live OS-preference changes while resolved
+  // that way ('system', or no settings loaded yet) - an explicit
+  // light/dark choice shouldn't shift out from under the user.
+  useEffect(() => {
+    const preference = settings ? settings.theme : 'system';
+    applyTheme(preference);
+
+    if (preference === 'system') {
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme(preference);
+      media.addEventListener('change', handleChange);
+      return () => media.removeEventListener('change', handleChange);
+    }
+    return undefined;
+  }, [settings]);
+
+  // The main window starts sized for the small Login card; grow it to
+  // the full app size once authenticated, and shrink back on lock.
+  useEffect(() => {
+    window.electron.setWindowMode(isAuthenticated ? 'app' : 'login');
+  }, [isAuthenticated]);
 
   const loadTree = useCallback(async () => {
     const result = await window.electron.getVaultTree();
@@ -102,15 +164,19 @@ function App() {
     if (result.success) setSettings(result.data);
   }, []);
 
+  const { canUndo, canRedo, undo, redo } = useUndoRedo({ enabled: isAuthenticated, onChanged: loadTree });
+
   useEffect(() => {
     if (!isAuthenticated) return undefined;
     loadTree();
     loadSettings();
 
-    const unsubscribe = window.electron.onVaultAutoLocked(() => {
-      setIsAuthenticated(false);
-      setCategories([]);
-      setEditingEntry(null);
+    const unsubscribe = window.electron.onVaultEvent((event) => {
+      if (event.action === 'vault.locked') {
+        setIsAuthenticated(false);
+        setCategories([]);
+        setEditingEntry(null);
+      }
     });
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,19 +213,37 @@ function App() {
     setSelectedCategoryId(categoryId);
     setSelectedFolderId(folderId);
     setSearchTerm('');
+    // Without this, navigating to a different folder/category while an
+    // entry's edit form is open leaves that form on screen (it isn't
+    // keyed to the selected folder), so the newly-selected folder's
+    // contents never actually get shown until the stale form is
+    // manually closed - easy to mistake for "the entry isn't there."
+    setEditingEntry(null);
+  };
+
+  const handleGoBack = () => {
+    if (!selectedFolderId) return; // already at category level, nothing above it
+    const parentId = findParentFolderId(categories, selectedCategoryId, selectedFolderId);
+    setSelectedFolderId(parentId || null);
+    setSearchTerm('');
+    setEditingEntry(null);
   };
 
   // ---- categories / folders ----
 
-  const handleAddCategory = async () => {
-    // eslint-disable-next-line no-alert
-    const name = window.prompt('New category name:');
-    if (!name || !name.trim()) return;
-    setLoading(true);
-    const result = await window.electron.addCategory(name.trim(), 'category');
-    setLoading(false);
-    if (result.success) loadTree();
-    else setError(result.error);
+  const handleAddCategory = () => {
+    setPromptModal({
+      title: 'New category name',
+      placeholder: 'e.g. Personal, Work',
+      onSubmit: async (name) => {
+        setPromptModal(null);
+        setLoading(true);
+        const result = await window.electron.addCategory(name, 'category');
+        setLoading(false);
+        if (result.success) loadTree();
+        else setError(result.error);
+      },
+    });
   };
 
   const handleDeleteCategory = async (categoryId) => {
@@ -177,15 +261,19 @@ function App() {
     } else setError(result.error);
   };
 
-  const handleAddFolder = async (categoryId, parentFolderId) => {
-    // eslint-disable-next-line no-alert
-    const name = window.prompt('New folder name:');
-    if (!name || !name.trim()) return;
-    setLoading(true);
-    const result = await window.electron.addFolder(categoryId, parentFolderId, name.trim());
-    setLoading(false);
-    if (result.success) loadTree();
-    else setError(result.error);
+  const handleAddFolder = (categoryId, parentFolderId) => {
+    setPromptModal({
+      title: 'New folder name',
+      placeholder: 'e.g. Documents',
+      onSubmit: async (name) => {
+        setPromptModal(null);
+        setLoading(true);
+        const result = await window.electron.addFolder(categoryId, parentFolderId, name);
+        setLoading(false);
+        if (result.success) loadTree();
+        else setError(result.error);
+      },
+    });
   };
 
   const handleDeleteFolder = async (categoryId, folderId) => {
@@ -200,10 +288,27 @@ function App() {
     } else setError(result.error);
   };
 
+  const handleMoveFolder = async (folderId, targetCategoryId, targetParentFolderId) => {
+    const result = await window.electron.moveFolder(folderId, targetCategoryId, targetParentFolderId);
+    if (result.success) loadTree();
+    else setError(result.error);
+  };
+
   // ---- entries ----
 
   const handleCreateEntry = async (template, title) => {
-    if (!selectedCategoryId) return;
+    if (!selectedFolderId) {
+      // Entries live inside folders, never directly in a category - the
+      // backend would silently no-op the insert (wrong folderId never
+      // matches anything in the tree) and this form would then open an
+      // edit view for an entry that doesn't actually exist anywhere,
+      // which only surfaces as a confusing "Entry not found" error later
+      // when trying to save it. Guarding here instead of relying solely
+      // on the button's disabled state, in case that ever gets out of sync.
+      setError('Select or create a folder first - entries live inside folders, not directly in categories.');
+      setShowNewEntryModal(false);
+      return;
+    }
     setLoading(true);
     const result = await window.electron.addEntry(selectedCategoryId, selectedFolderId, { title, template });
     setLoading(false);
@@ -250,15 +355,21 @@ function App() {
 
   // ---- derived state ----
 
+  // Browsing a folder/category shows only its DIRECT children - entries
+  // that live one level down (in a subfolder) show up by navigating into
+  // that subfolder, not flattened into the parent's list. Categories
+  // never hold entries directly (only via folders), so selecting just a
+  // category shows its root folders with zero entries until you open one.
   const currentFolder = findFolder(categories, selectedCategoryId, selectedFolderId);
   const currentCategory = findCategory(categories, selectedCategoryId);
-  const visibleEntries = searchResults
-    ? searchResults
+  const visibleSubfolders = searchResults
+    ? []
     : currentFolder
-      ? collectEntries(currentFolder)
+      ? currentFolder.folders
       : currentCategory
-        ? collectCategoryEntries(currentCategory)
+        ? currentCategory.folders
         : [];
+  const visibleEntries = searchResults ? searchResults : currentFolder ? currentFolder.entries : [];
 
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
@@ -271,6 +382,12 @@ function App() {
         <nav className="nav-tabs">
           <button className={`nav-tab ${activeTab === 'vault' ? 'active' : ''}`} onClick={() => setActiveTab('vault')}>
             📋 Vault
+          </button>
+          <button className="nav-tab" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
+            ↩️ Undo
+          </button>
+          <button className="nav-tab" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
+            ↪️ Redo
           </button>
           <button
             className={`nav-tab ${activeTab === 'recycle' ? 'active' : ''}`}
@@ -315,15 +432,24 @@ function App() {
               onAddFolder={handleAddFolder}
               onDeleteCategory={handleDeleteCategory}
               onDeleteFolder={handleDeleteFolder}
+              onMoveFolder={handleMoveFolder}
             />
           </aside>
 
           <main className="main-panel">
             <div className="panel-header">
-              <h2>{currentFolder ? currentFolder.name : currentCategory ? currentCategory.name : 'Select a category'}</h2>
+              <div className="panel-header-title">
+                {selectedFolderId && (
+                  <button className="btn-back" onClick={handleGoBack} title="Back">
+                    ⬅
+                  </button>
+                )}
+                <h2>{currentFolder ? currentFolder.name : currentCategory ? currentCategory.name : 'Select a category'}</h2>
+              </div>
               <button
                 className="btn btn-primary"
-                disabled={!selectedCategoryId || loading}
+                disabled={!selectedFolderId || loading}
+                title={!selectedFolderId ? 'Select or create a folder first - entries live inside folders' : undefined}
                 onClick={() => setShowNewEntryModal(true)}
               >
                 ➕ New Entry
@@ -340,12 +466,15 @@ function App() {
             ) : (
               <EntryList
                 entries={visibleEntries}
+                subfolders={visibleSubfolders}
+                onOpenFolder={(folderId) => handleSelectFolder(selectedCategoryId, folderId)}
                 searchTerm={searchTerm}
                 onSearchTermChange={setSearchTerm}
                 onEdit={setEditingEntry}
                 onDelete={handleDeleteEntry}
                 onDuplicate={handleDuplicateEntry}
                 onToggleFavorite={handleToggleFavorite}
+                clipboardClearSeconds={settings ? settings.clipboardClearSeconds : 20}
               />
             )}
           </main>
@@ -372,6 +501,15 @@ function App() {
 
       {showNewEntryModal && (
         <NewEntryModal onCreate={handleCreateEntry} onCancel={() => setShowNewEntryModal(false)} />
+      )}
+
+      {promptModal && (
+        <PromptModal
+          title={promptModal.title}
+          placeholder={promptModal.placeholder}
+          onSubmit={promptModal.onSubmit}
+          onCancel={() => setPromptModal(null)}
+        />
       )}
     </div>
   );

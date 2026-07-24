@@ -17,7 +17,7 @@ function matchesQuery(haystack, query) {
  * non-hidden field values (hidden/secret values like passwords and PINs
  * are intentionally excluded from search matching).
  */
-function entryMatches(entry, query) {
+export function entryMatches(entry, query) {
   if (matchesQuery(entry.title, query)) return true;
   if (entry.tags.some((tag) => matchesQuery(tag, query))) return true;
   return entry.fields.some((field) => {
@@ -35,7 +35,7 @@ function entryMatches(entry, query) {
  * @param {string} query
  * @returns {Array<{ type: 'category'|'folder'|'entry', item: Object, categoryId: string, categoryName: string, folderPath: Array<{id:string,name:string}> }>}
  */
-function search(vault, query) {
+export function search(vault, query) {
   const trimmed = (query || '').trim();
   if (!trimmed) return [];
 
@@ -86,8 +86,3 @@ function search(vault, query) {
 
   return results;
 }
-
-module.exports = {
-  search,
-  entryMatches,
-};

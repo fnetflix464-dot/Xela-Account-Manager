@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #f9fafb;
+  background: var(--color-bg-app);
 }
 
 .app-header {
@@ -73,8 +73,8 @@
 
 .sidebar {
   width: 280px;
-  background: white;
-  border-right: 1px solid #e5e7eb;
+  background: var(--color-bg-surface);
+  border-right: 1px solid var(--color-border);
   overflow-y: auto;
   box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
 }
@@ -90,11 +90,41 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+  gap: 1rem;
 }
 
 .panel-header h2 {
   margin: 0;
-  color: #1f2937;
+  color: var(--color-text-primary);
+}
+
+.panel-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--color-bg-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-back:hover {
+  background: var(--color-active-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 /* Authentication */
@@ -107,10 +137,10 @@
 }
 
 .auth-card {
-  background: white;
+  background: var(--color-bg-surface);
   padding: 3rem;
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-modal);
   text-align: center;
   width: 100%;
   max-width: 400px;
@@ -118,13 +148,13 @@
 
 .auth-card h1 {
   margin: 0 0 0.5rem 0;
-  color: #1f2937;
+  color: var(--color-text-primary);
   font-size: 1.75rem;
 }
 
 .auth-card p {
   margin: 0 0 2rem 0;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
 }
 
@@ -132,7 +162,7 @@
   width: 100%;
   padding: 0.75rem;
   margin: 0 0 1.5rem 0;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   font-size: 1rem;
   transition: all 0.3s ease;

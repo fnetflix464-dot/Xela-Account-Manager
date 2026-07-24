@@ -1,21 +1,21 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 // ---- Parameters -----------------------------------------------------------
 // AES-256-GCM: 256-bit key, 96-bit (12 byte) IV is the NIST-recommended size
 // for GCM, 128-bit (16 byte) authentication tag.
-const ALGORITHM = 'aes-256-gcm';
-const KEY_LENGTH = 32; // 256 bits
-const IV_LENGTH = 12; // 96 bits, recommended for GCM
+export const ALGORITHM = 'aes-256-gcm';
+export const KEY_LENGTH = 32; // 256 bits
+export const IV_LENGTH = 12; // 96 bits, recommended for GCM
 const AUTH_TAG_LENGTH = 16; // 128 bits
-const SALT_LENGTH = 32; // 256 bits
-const PBKDF2_ITERATIONS = 210000; // OWASP 2023+ recommendation for PBKDF2-HMAC-SHA256
+export const SALT_LENGTH = 32; // 256 bits
+export const PBKDF2_ITERATIONS = 210000; // OWASP 2023+ recommendation for PBKDF2-HMAC-SHA256
 const PBKDF2_DIGEST = 'sha256';
 
 /**
  * Generates a cryptographically random salt for key derivation.
  * @returns {Buffer}
  */
-function generateSalt() {
+export function generateSalt() {
   return crypto.randomBytes(SALT_LENGTH);
 }
 
@@ -25,7 +25,7 @@ function generateSalt() {
  * @param {Buffer} salt
  * @returns {Buffer} 32-byte derived key
  */
-function deriveKey(password, salt) {
+export function deriveKey(password, salt) {
   if (typeof password !== 'string' || password.length === 0) {
     throw new Error('Password must be a non-empty string');
   }
@@ -43,7 +43,7 @@ function deriveKey(password, salt) {
  * @param {Buffer} key 32-byte derived key
  * @returns {{ iv: string, authTag: string, ciphertext: string }} base64-encoded parts
  */
-function encrypt(plaintext, key) {
+export function encrypt(plaintext, key) {
   if (!Buffer.isBuffer(key) || key.length !== KEY_LENGTH) {
     throw new Error('Encryption key must be a 32-byte Buffer');
   }
@@ -67,7 +67,7 @@ function encrypt(plaintext, key) {
  * @param {Buffer} key 32-byte derived key
  * @returns {string} plaintext
  */
-function decrypt(payload, key) {
+export function decrypt(payload, key) {
   if (!Buffer.isBuffer(key) || key.length !== KEY_LENGTH) {
     throw new Error('Decryption key must be a 32-byte Buffer');
   }
@@ -97,14 +97,14 @@ function decrypt(payload, key) {
 /**
  * Encrypts a JS object as JSON.
  */
-function encryptObject(obj, key) {
+export function encryptObject(obj, key) {
   return encrypt(JSON.stringify(obj), key);
 }
 
 /**
  * Decrypts a payload and parses it as JSON.
  */
-function decryptObject(payload, key) {
+export function decryptObject(payload, key) {
   return JSON.parse(decrypt(payload, key));
 }
 
@@ -112,7 +112,7 @@ function decryptObject(payload, key) {
  * Verifies a password against a stored salt + a known-good encrypted probe
  * payload without throwing - returns a boolean.
  */
-function verifyPassword(password, salt, probePayload) {
+export function verifyPassword(password, salt, probePayload) {
   try {
     const key = deriveKey(password, salt);
     decrypt(probePayload, key);
@@ -121,18 +121,3 @@ function verifyPassword(password, salt, probePayload) {
     return false;
   }
 }
-
-module.exports = {
-  ALGORITHM,
-  KEY_LENGTH,
-  IV_LENGTH,
-  SALT_LENGTH,
-  PBKDF2_ITERATIONS,
-  generateSalt,
-  deriveKey,
-  encrypt,
-  decrypt,
-  encryptObject,
-  decryptObject,
-  verifyPassword,
-};

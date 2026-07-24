@@ -1,13 +1,13 @@
-const { createSettings } = require('./Settings');
+import { createSettings } from './Settings.js';
 
-const VAULT_VERSION = 1;
+export const VAULT_VERSION = 1;
 
 /**
  * Creates an empty Vault. This is the root object that gets encrypted
  * and written to vault.xam in its entirety.
  * @param {Object} [overrides]
  */
-function createVault(overrides = {}) {
+export function createVault(overrides = {}) {
   const now = new Date().toISOString();
   return {
     version: VAULT_VERSION,
@@ -20,26 +20,11 @@ function createVault(overrides = {}) {
   };
 }
 
-function touchVault(vault) {
+export function touchVault(vault) {
   return { ...vault, updatedAt: new Date().toISOString() };
 }
 
-/**
- * Appends an activity log entry (capped at 500 most-recent entries so the
- * vault file doesn't grow unbounded).
- */
-function logActivity(vault, action, details = {}) {
-  const entry = {
-    id: require('crypto').randomUUID(),
-    action,
-    details,
-    timestamp: new Date().toISOString(),
-  };
-  const activityLog = [entry, ...vault.activityLog].slice(0, 500);
-  return { ...vault, activityLog };
-}
-
-function isVaultValid(vault) {
+export function isVaultValid(vault) {
   return (
     !!vault &&
     typeof vault.version === 'number' &&
@@ -49,11 +34,3 @@ function isVaultValid(vault) {
     Array.isArray(vault.recycleBin)
   );
 }
-
-module.exports = {
-  VAULT_VERSION,
-  createVault,
-  touchVault,
-  logActivity,
-  isVaultValid,
-};

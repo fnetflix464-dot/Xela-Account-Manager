@@ -28,6 +28,19 @@ function Settings({ onSettingsChanged }) {
     setSettings((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Theme gets a live preview - flipping the dropdown applies it
+  // immediately (via the same callback "Save" uses), rather than leaving
+  // the user staring at an unchanged screen wondering if their click
+  // registered. It's still not persisted to disk until Save is pressed,
+  // same as every other setting.
+  const handleThemeChange = (value) => {
+    setSettings((prev) => {
+      const next = { ...prev, theme: value };
+      onSettingsChanged(next);
+      return next;
+    });
+  };
+
   const handleGeneratorChange = (field, value) => {
     setSettings((prev) => ({ ...prev, passwordGenerator: { ...prev.passwordGenerator, [field]: value } }));
   };
@@ -119,7 +132,7 @@ function Settings({ onSettingsChanged }) {
         <h3>Display</h3>
         <div className="setting-item">
           <label>Theme</label>
-          <select value={settings.theme} onChange={(e) => handleChange('theme', e.target.value)}>
+          <select value={settings.theme} onChange={(e) => handleThemeChange(e.target.value)}>
             <option value="light">☀️ Light</option>
             <option value="dark">🌙 Dark</option>
             <option value="system">🖥️ System</option>
@@ -136,6 +149,24 @@ function Settings({ onSettingsChanged }) {
             min="0"
             value={settings.autoLockMinutes}
             onChange={(e) => handleChange('autoLockMinutes', Number(e.target.value))}
+          />
+        </div>
+        <div className="setting-item">
+          <label>Clear clipboard after copying a password (seconds, 0 = never)</label>
+          <input
+            type="number"
+            min="0"
+            value={settings.clipboardClearSeconds}
+            onChange={(e) => handleChange('clipboardClearSeconds', Number(e.target.value))}
+          />
+        </div>
+        <div className="setting-item">
+          <label>Password history entries to keep per field (0 = disabled)</label>
+          <input
+            type="number"
+            min="0"
+            value={settings.passwordHistoryLimit}
+            onChange={(e) => handleChange('passwordHistoryLimit', Number(e.target.value))}
           />
         </div>
       </div>

@@ -1,12 +1,36 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, powerMonitor } = require('electron');
 const isDev = require('electron-is-dev');
 const path = require('path');
 
-const { createVaultService } = require('../src/services/VaultService');
+// public/electron.js stays CommonJS: Electron's ESM support for the main
+// process does not correctly resolve the 'electron' built-in module when
+// loaded via `import` (verified - it either fails to link entirely or
+// falls back to the plain path-string export that `require('electron')`
+// returns outside of a real Electron process). `src/services/VaultService`
+// and everything under it are genuine ES Modules; a CommonJS file can
+// still consume them via dynamic `import()`, which is the officially
+// supported CJS-consumes-ESM interop path.
+let vaultService;
+let commandManager;
+let createVaultMutationCommand;
+let idleLockService;
 
 let mainWindow;
-let vaultService;
-let autoLockTimer = null;
+
+// The Login/Unlock screen is a small centered card - no reason to open
+// the full app-sized window behind it. The window resizes between these
+// two presets as the renderer moves between authenticated/unauthenticated.
+const LOGIN_WINDOW = { width: 520, height: 700, minWidth: 460, minHeight: 600 };
+const APP_WINDOW = { width: 1280, height: 840, minWidth: 900, minHeight: 600 };
+
+function setWindowMode(mode) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const size = mode === 'app' ? APP_WINDOW : LOGIN_WINDOW;
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  mainWindow.setMinimumSize(size.minWidth, size.minHeight);
+  mainWindow.setSize(size.width, size.height);
+  mainWindow.center();
+}
 
 function vaultFilePath() {
   return path.join(app.getPath('userData'), 'vault.xam');
@@ -16,47 +40,69 @@ function backupDirPath() {
   return path.join(app.getPath('userData'), 'backups');
 }
 
-function initializeVaultService() {
+async function initializeVaultService() {
+  const { createVaultService } = await import('../src/services/VaultService.js');
+  const { eventBus, VAULT_EVENT_CHANNEL } = await import('../src/services/EventBus.js');
+  const { createCommandManager } = await import('../src/commands/CommandManager.js');
+  const { createIdleLockService } = await import('../src/services/IdleLockService.js');
+  ({ createVaultMutationCommand } = await import('../src/commands/VaultMutationCommand.js'));
+
   vaultService = createVaultService({
     vaultFilePath: vaultFilePath(),
     backupDir: backupDirPath(),
   });
+  commandManager = createCommandManager();
+  idleLockService = createIdleLockService({ powerMonitor });
+
+  // Forward every domain event (category/folder/entry mutations, vault
+  // lifecycle transitions, undo/redo stack changes) to the renderer on
+  // one generalized channel. This replaces the old single-purpose
+  // 'vault-auto-locked' push - the renderer now reacts to
+  // `event.action === 'vault.locked'` the same way whether the lock
+  // happened via idle auto-lock or a direct IPC call.
+  eventBus.on(VAULT_EVENT_CHANNEL, (event) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(VAULT_EVENT_CHANNEL, event);
+    }
+    handleIdleLockLifecycle(event);
+  });
 }
 
-// ---- auto-lock -------------------------------------------------------
-// Any successful IPC call resets the idle timer. When it fires, the vault
-// is locked in memory and the renderer is notified to show the unlock
-// screen again. Purely local - no network, no telemetry.
-function resetAutoLockTimer() {
-  if (autoLockTimer) clearTimeout(autoLockTimer);
-  if (!vaultService || !vaultService.isUnlocked()) return;
-
-  let minutes = 5;
-  try {
-    minutes = vaultService.getSettings().autoLockMinutes;
-  } catch {
-    // vault locked mid-read; ignore
-  }
-  if (!minutes || minutes <= 0) return; // 0/undefined disables auto-lock
-
-  autoLockTimer = setTimeout(() => {
-    if (vaultService && vaultService.isUnlocked()) {
-      vaultService.lock();
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('vault-auto-locked');
-      }
+// ---- idle auto-lock ---------------------------------------------------
+// Polls real OS idle time (see src/services/IdleLockService.js) rather
+// than resetting a timer on every IPC call - (re)started whenever the
+// vault becomes unlocked or its autoLockMinutes setting changes, stopped
+// the moment it locks (nothing to poll for while locked).
+function handleIdleLockLifecycle(event) {
+  if (event.action === 'vault.created' || event.action === 'vault.unlocked' || event.action === 'settings.updated') {
+    if (vaultService.isUnlocked()) {
+      idleLockService.start(vaultService.getSettings().autoLockMinutes, () => {
+        if (vaultService.isUnlocked()) vaultService.lock();
+      });
     }
-  }, minutes * 60 * 1000);
+  } else if (event.action === 'vault.locked') {
+    idleLockService.stop();
+  }
+}
+
+// Runs `run` as an undoable command (see src/commands/). Used only for
+// mutations that make sense to snapshot/restore wholesale - excluded are
+// settings changes, master-password/import/restore-backup (which change
+// the vault's encryption identity, not just its content), and permanent
+// deletion (the UI explicitly promises those "cannot be undone").
+function withUndo(label, run) {
+  return commandManager.execute(createVaultMutationCommand(vaultService, label, run));
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 840,
-    minWidth: 900,
-    minHeight: 600,
+    width: LOGIN_WINDOW.width,
+    height: LOGIN_WINDOW.height,
+    minWidth: LOGIN_WINDOW.minWidth,
+    minHeight: LOGIN_WINDOW.minHeight,
+    center: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -78,8 +124,8 @@ function createWindow() {
   });
 }
 
-app.on('ready', () => {
-  initializeVaultService();
+app.on('ready', async () => {
+  await initializeVaultService();
   createWindow();
 });
 
@@ -99,18 +145,26 @@ app.on('activate', () => {
 });
 
 // Every IPC handler below is wrapped the same way: try/catch, return
-// { success, data|error }, and reset the auto-lock idle timer on success.
+// { success, data|error }. Auto-lock is driven by real OS idle time (see
+// handleIdleLockLifecycle above), not by IPC activity, so there is
+// nothing to reset here.
 function handle(channel, fn) {
   ipcMain.handle(channel, async (event, ...args) => {
     try {
       const data = await fn(...args);
-      resetAutoLockTimer();
       return { success: true, data };
     } catch (error) {
       return { success: false, error: error.message };
     }
   });
 }
+
+// ==================== WINDOW ====================
+
+handle('set-window-mode', (mode) => {
+  setWindowMode(mode);
+  return true;
+});
 
 // ==================== MASTER PASSWORD / VAULT LIFECYCLE ====================
 
@@ -138,42 +192,68 @@ handle('change-master-password', (currentPassword, newPassword) =>
 // ==================== CATEGORIES ====================
 
 handle('get-vault-tree', () => vaultService.getVault().categories);
-handle('add-category', (name, icon) => vaultService.addCategory(name, icon));
-handle('rename-category', (categoryId, name) => vaultService.renameCategory(categoryId, name));
-handle('delete-category', (categoryId) => vaultService.deleteCategory(categoryId));
+handle('add-category', (name, icon) => withUndo('Add category', () => vaultService.addCategory(name, icon)));
+handle('rename-category', (categoryId, name) =>
+  withUndo('Rename category', () => vaultService.renameCategory(categoryId, name)),
+);
+handle('delete-category', (categoryId) =>
+  withUndo('Delete category', () => vaultService.deleteCategory(categoryId)),
+);
 
 // ==================== FOLDERS ====================
 
 handle('add-folder', (categoryId, parentFolderId, name) =>
-  vaultService.addFolder(categoryId, parentFolderId, name),
+  withUndo('Add folder', () => vaultService.addFolder(categoryId, parentFolderId, name)),
 );
-handle('rename-folder', (categoryId, folderId, name) => vaultService.renameFolder(categoryId, folderId, name));
-handle('delete-folder', (categoryId, folderId) => vaultService.deleteFolder(categoryId, folderId));
+handle('rename-folder', (categoryId, folderId, name) =>
+  withUndo('Rename folder', () => vaultService.renameFolder(categoryId, folderId, name)),
+);
+handle('delete-folder', (categoryId, folderId) =>
+  withUndo('Delete folder', () => vaultService.deleteFolder(categoryId, folderId)),
+);
 handle('move-folder', (folderId, targetCategoryId, targetParentFolderId) =>
-  vaultService.moveFolder(folderId, targetCategoryId, targetParentFolderId),
+  withUndo('Move folder', () => vaultService.moveFolder(folderId, targetCategoryId, targetParentFolderId)),
 );
 
 // ==================== ENTRIES ====================
 
 handle('add-entry', (categoryId, folderId, entryData) =>
-  vaultService.addEntry(categoryId, folderId, entryData),
+  withUndo('Add entry', () => vaultService.addEntry(categoryId, folderId, entryData)),
 );
-handle('update-entry', (entryId, updates) => vaultService.updateEntryFields(entryId, updates));
-handle('delete-entry', (entryId) => vaultService.deleteEntry(entryId));
+handle('update-entry', (entryId, updates) =>
+  withUndo('Update entry', () => vaultService.updateEntryFields(entryId, updates)),
+);
+handle('delete-entry', (entryId) => withUndo('Delete entry', () => vaultService.deleteEntry(entryId)));
 handle('move-entry', (entryId, targetCategoryId, targetFolderId) =>
-  vaultService.moveEntry(entryId, targetCategoryId, targetFolderId),
+  withUndo('Move entry', () => vaultService.moveEntry(entryId, targetCategoryId, targetFolderId)),
 );
-handle('duplicate-entry', (entryId) => vaultService.duplicateEntryById(entryId));
-handle('toggle-favorite', (entryId) => vaultService.toggleFavorite(entryId));
+handle('duplicate-entry', (entryId) =>
+  withUndo('Duplicate entry', () => vaultService.duplicateEntryById(entryId)),
+);
+handle('toggle-favorite', (entryId) => withUndo('Toggle favorite', () => vaultService.toggleFavorite(entryId)));
 handle('list-favorites', () => vaultService.listFavorites());
 handle('list-recent-activity', (limit) => vaultService.listRecentActivity(limit));
+handle('record-error', (message, stack) => {
+  vaultService.recordError(message, stack);
+  return true;
+});
 
 // ==================== RECYCLE BIN ====================
 
 handle('get-recycle-bin', () => vaultService.getVault().recycleBin);
-handle('restore-from-recycle-bin', (recycleId) => vaultService.restoreFromRecycleBin(recycleId));
+handle('restore-from-recycle-bin', (recycleId) =>
+  withUndo('Restore from recycle bin', () => vaultService.restoreFromRecycleBin(recycleId)),
+);
+// Permanent deletion is intentionally NOT undoable - the Recycle Bin UI
+// explicitly tells the user these actions "cannot be undone".
 handle('permanently-delete', (recycleId) => vaultService.permanentlyDelete(recycleId));
 handle('empty-recycle-bin', () => vaultService.emptyRecycleBin());
+
+// ==================== UNDO / REDO ====================
+
+handle('undo', () => commandManager.undo());
+handle('redo', () => commandManager.redo());
+handle('get-undo-state', () => ({ canUndo: commandManager.canUndo(), canRedo: commandManager.canRedo() }));
 
 // ==================== SEARCH ====================
 
@@ -186,15 +266,10 @@ handle('update-settings', (updates) => vaultService.updateVaultSettings(updates)
 
 // ==================== BACKUP / IMPORT / EXPORT ====================
 
-handle('list-backups', () => {
-  const BackupService = require('../src/services/BackupService');
-  return BackupService.listBackups(backupDirPath());
-});
+handle('list-backups', () => vaultService.listBackups());
 
 handle('restore-backup', (backupPath) => {
-  const BackupService = require('../src/services/BackupService');
-  BackupService.restoreBackup(backupPath, vaultFilePath(), backupDirPath(), vaultService.getSettings().backupCount);
-  vaultService.lock();
+  vaultService.restoreBackup(backupPath);
   return true;
 });
 

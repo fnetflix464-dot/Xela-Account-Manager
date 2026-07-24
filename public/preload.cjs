@@ -4,6 +4,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 // renderer never touches Node's fs/crypto directly - all vault access is
 // mediated by the main process (see electron.js + src/services).
 contextBridge.exposeInMainWorld('electron', {
+  // ---- window ----
+  setWindowMode: (mode) => ipcRenderer.invoke('set-window-mode', mode),
+
   // ---- master password / vault lifecycle ----
   // Names kept stable (checkMasterPasswordExists / setMasterPassword /
   // verifyMasterPassword) so the existing Login screen keeps working
@@ -14,10 +17,13 @@ contextBridge.exposeInMainWorld('electron', {
   lockVault: () => ipcRenderer.invoke('lock-vault'),
   changeMasterPassword: (currentPassword, newPassword) =>
     ipcRenderer.invoke('change-master-password', currentPassword, newPassword),
-  onVaultAutoLocked: (callback) => {
-    const listener = () => callback();
-    ipcRenderer.on('vault-auto-locked', listener);
-    return () => ipcRenderer.removeListener('vault-auto-locked', listener);
+  // Generalized push channel for domain events (category/folder/entry
+  // mutations, vault lifecycle transitions) - callback receives
+  // { action, details, timestamp }.
+  onVaultEvent: (callback) => {
+    const listener = (event, payload) => callback(payload);
+    ipcRenderer.on('vault-event', listener);
+    return () => ipcRenderer.removeListener('vault-event', listener);
   },
 
   // ---- categories ----
@@ -44,12 +50,18 @@ contextBridge.exposeInMainWorld('electron', {
   toggleFavorite: (entryId) => ipcRenderer.invoke('toggle-favorite', entryId),
   listFavorites: () => ipcRenderer.invoke('list-favorites'),
   listRecentActivity: (limit) => ipcRenderer.invoke('list-recent-activity', limit),
+  recordError: (message, stack) => ipcRenderer.invoke('record-error', message, stack),
 
   // ---- recycle bin ----
   getRecycleBin: () => ipcRenderer.invoke('get-recycle-bin'),
   restoreFromRecycleBin: (recycleId) => ipcRenderer.invoke('restore-from-recycle-bin', recycleId),
   permanentlyDelete: (recycleId) => ipcRenderer.invoke('permanently-delete', recycleId),
   emptyRecycleBin: () => ipcRenderer.invoke('empty-recycle-bin'),
+
+  // ---- undo / redo ----
+  undo: () => ipcRenderer.invoke('undo'),
+  redo: () => ipcRenderer.invoke('redo'),
+  getUndoState: () => ipcRenderer.invoke('get-undo-state'),
 
   // ---- search ----
   searchVault: (query) => ipcRenderer.invoke('search-vault', query),

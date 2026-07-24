@@ -1,18 +1,18 @@
-const { randomUUID } = require('crypto');
-const path = require('path');
+import * as VaultRepository from '../repositories/VaultRepository.js';
+import * as SearchService from './SearchService.js';
+import * as ActivityLogService from './ActivityLogService.js';
+import * as RecycleBinService from './RecycleBinService.js';
+import * as SettingsService from './SettingsService.js';
+import { emitVaultEvent } from './EventBus.js';
 
-const CryptoService = require('./CryptoService');
-const FileService = require('./FileService');
-const BackupService = require('./BackupService');
+import { createVault, touchVault, isVaultValid } from '../models/Vault.js';
+import { createCategory } from '../models/Category.js';
+import { createFolder, findFolderById, findParentFolder } from '../models/Folder.js';
+import { createEntry, updateEntry as applyEntryUpdate, duplicateEntry } from '../models/Entry.js';
+import { updateField } from '../models/Field.js';
+import { nextHistory } from '../models/PasswordHistory.js';
 
-const { createVault, touchVault, logActivity, isVaultValid } = require('../models/Vault');
-const { createCategory } = require('../models/Category');
-const { createFolder, findFolderById, findParentFolder } = require('../models/Folder');
-const { createEntry, updateEntry: applyEntryUpdate, duplicateEntry } = require('../models/Entry');
-const { updateField } = require('../models/Field');
-const { updateSettings: applySettingsUpdate } = require('../models/Settings');
-
-const MAX_PASSWORD_HISTORY = 20;
+const logActivity = ActivityLogService.record;
 
 /**
  * VaultService holds all runtime state for a single unlocked vault session
@@ -20,7 +20,7 @@ const MAX_PASSWORD_HISTORY = 20;
  * never on disk in plaintext). It is instantiated once per app run in the
  * Electron main process.
  */
-function createVaultService({ vaultFilePath, backupDir }) {
+export function createVaultService({ vaultFilePath, backupDir }) {
   let sessionKey = null; // Buffer - derived AES key, present only while unlocked
   let salt = null; // Buffer - PBKDF2 salt read from / written to the vault file
   let vault = null; // decrypted Vault object, present only while unlocked
@@ -28,7 +28,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
   // ---- session -------------------------------------------------------
 
   function vaultFileExists() {
-    return FileService.pathExists(vaultFilePath);
+    return VaultRepository.exists(vaultFilePath);
   }
 
   function isUnlocked() {
@@ -45,20 +45,16 @@ function createVaultService({ vaultFilePath, backupDir }) {
     sessionKey = null;
     salt = null;
     vault = null;
+    emitVaultEvent('vault.locked');
   }
 
   /**
-   * Persists the in-memory vault to disk: rotate a backup of the previous
-   * file, then encrypt + atomically write the current state.
+   * Persists the in-memory vault to disk via the repository (which handles
+   * backup rotation + encryption + the atomic write).
    */
   function persist() {
     requireUnlocked();
-    BackupService.createBackup(vaultFilePath, backupDir, vault.settings.backupCount);
-    const envelope = CryptoService.encryptObject(vault, sessionKey);
-    FileService.writeVaultFile(vaultFilePath, {
-      salt: salt.toString('base64'),
-      ...envelope,
-    });
+    VaultRepository.save(vaultFilePath, backupDir, vault, sessionKey, salt);
   }
 
   /**
@@ -73,10 +69,17 @@ function createVaultService({ vaultFilePath, backupDir }) {
       throw new Error('Master password must be at least 8 characters');
     }
 
-    salt = CryptoService.generateSalt();
-    sessionKey = CryptoService.deriveKey(masterPassword, salt);
-    vault = logActivity(createVault(), 'vault.created');
-    persist();
+    const initialVault = logActivity(createVault(), 'vault.created');
+    const { sessionKey: newKey, salt: newSalt } = VaultRepository.create(
+      vaultFilePath,
+      backupDir,
+      masterPassword,
+      initialVault,
+    );
+    salt = newSalt;
+    sessionKey = newKey;
+    vault = initialVault;
+    emitVaultEvent('vault.created');
     return true;
   }
 
@@ -85,18 +88,18 @@ function createVaultService({ vaultFilePath, backupDir }) {
    * success; throws on wrong password / missing / corrupted vault.
    */
   function unlock(masterPassword) {
-    const envelope = FileService.readVaultFile(vaultFilePath);
-    const candidateSalt = Buffer.from(envelope.salt, 'base64');
-    const candidateKey = CryptoService.deriveKey(masterPassword, candidateSalt);
-
-    const decrypted = CryptoService.decryptObject(envelope, candidateKey); // throws if wrong password
+    const { vault: decrypted, sessionKey: newKey, salt: newSalt } = VaultRepository.load(
+      vaultFilePath,
+      masterPassword,
+    );
     if (!isVaultValid(decrypted)) {
       throw new Error('Vault file is corrupted');
     }
 
-    salt = candidateSalt;
-    sessionKey = candidateKey;
+    salt = newSalt;
+    sessionKey = newKey;
     vault = decrypted;
+    emitVaultEvent('vault.unlocked');
     return true;
   }
 
@@ -105,19 +108,32 @@ function createVaultService({ vaultFilePath, backupDir }) {
     return vault;
   }
 
+  /**
+   * Replaces the in-memory vault wholesale with a previously-captured
+   * snapshot (from `getVault()`) and persists it. Used by undo/redo -
+   * intentionally does not `touchVault()` the snapshot, so restoring is
+   * byte-identical to the state that was actually captured.
+   */
+  function restoreSnapshot(snapshot) {
+    requireUnlocked();
+    vault = snapshot;
+    persist();
+  }
+
   function changeMasterPassword(currentPassword, newPassword) {
     requireUnlocked();
-    const candidateKey = CryptoService.deriveKey(currentPassword, salt);
-    if (Buffer.compare(candidateKey, sessionKey) !== 0) {
+    if (!VaultRepository.verifyKey(currentPassword, salt, sessionKey)) {
       throw new Error('Current password is incorrect');
     }
     if (!newPassword || newPassword.length < 8) {
       throw new Error('New master password must be at least 8 characters');
     }
-    salt = CryptoService.generateSalt();
-    sessionKey = CryptoService.deriveKey(newPassword, salt);
+    const { sessionKey: newKey, salt: newSalt } = VaultRepository.deriveNewKey(newPassword);
+    salt = newSalt;
+    sessionKey = newKey;
     vault = logActivity(touchVault(vault), 'vault.masterPasswordChanged');
     persist();
+    emitVaultEvent('vault.masterPasswordChanged');
     return true;
   }
 
@@ -185,6 +201,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
       name,
     });
     persist();
+    emitVaultEvent('category.created', { categoryId: category.id, name });
     return category;
   }
 
@@ -199,6 +216,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
       { categoryId, name },
     );
     persist();
+    emitVaultEvent('category.renamed', { categoryId, name });
   }
 
   function deleteCategory(categoryId) {
@@ -206,22 +224,20 @@ function createVaultService({ vaultFilePath, backupDir }) {
     const category = vault.categories.find((c) => c.id === categoryId);
     if (!category) throw new Error('Category not found');
 
-    const recycled = {
-      id: randomUUID(),
-      type: 'category',
-      item: category,
-      deletedAt: new Date().toISOString(),
-    };
+    const recycled = RecycleBinService.buildRecord({ type: 'category', item: category });
     vault = logActivity(
-      touchVault({
-        ...vault,
-        categories: vault.categories.filter((c) => c.id !== categoryId),
-        recycleBin: [recycled, ...vault.recycleBin],
-      }),
+      RecycleBinService.addRecord(
+        touchVault({
+          ...vault,
+          categories: vault.categories.filter((c) => c.id !== categoryId),
+        }),
+        recycled,
+      ),
       'category.deleted',
       { categoryId, name: category.name },
     );
     persist();
+    emitVaultEvent('category.deleted', { categoryId, name: category.name });
   }
 
   // ---- folders -----------------------------------------------------------
@@ -245,6 +261,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
 
     vault = logActivity(touchVault(vault), 'folder.created', { folderId: newFolder.id, name });
     persist();
+    emitVaultEvent('folder.created', { folderId: newFolder.id, name });
     return newFolder;
   }
 
@@ -253,6 +270,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     mutateFolder(categoryId, folderId, (f) => ({ ...f, name, updatedAt: new Date().toISOString() }));
     vault = logActivity(touchVault(vault), 'folder.renamed', { folderId, name });
     persist();
+    emitVaultEvent('folder.renamed', { folderId, name });
   }
 
   function deleteFolder(categoryId, folderId) {
@@ -260,13 +278,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     const located = locateFolder(folderId);
     if (!located) throw new Error('Folder not found');
 
-    const recycled = {
-      id: randomUUID(),
-      type: 'folder',
-      item: located.folder,
-      categoryId,
-      deletedAt: new Date().toISOString(),
-    };
+    const recycled = RecycleBinService.buildRecord({ type: 'folder', item: located.folder, categoryId });
 
     if (located.parentFolder) {
       mutateFolder(categoryId, located.parentFolder.id, (f) => ({
@@ -282,11 +294,12 @@ function createVaultService({ vaultFilePath, backupDir }) {
       };
     }
 
-    vault = logActivity(touchVault({ ...vault, recycleBin: [recycled, ...vault.recycleBin] }), 'folder.deleted', {
+    vault = logActivity(RecycleBinService.addRecord(touchVault(vault), recycled), 'folder.deleted', {
       folderId,
       name: located.folder.name,
     });
     persist();
+    emitVaultEvent('folder.deleted', { folderId, name: located.folder.name });
   }
 
   function moveFolder(folderId, targetCategoryId, targetParentFolderId) {
@@ -315,6 +328,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
 
     vault = logActivity(touchVault(vault), 'folder.moved', { folderId, targetCategoryId, targetParentFolderId });
     persist();
+    emitVaultEvent('folder.moved', { folderId, targetCategoryId, targetParentFolderId });
   }
 
   // internal: remove a folder from the tree without recycle-bin bookkeeping
@@ -344,6 +358,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     mutateFolder(categoryId, folderId, (f) => ({ ...f, entries: [...f.entries, entry] }));
     vault = logActivity(touchVault(vault), 'entry.created', { entryId: entry.id, title: entry.title });
     persist();
+    emitVaultEvent('entry.created', { entryId: entry.id, title: entry.title });
     return entry;
   }
 
@@ -359,14 +374,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
         if (!existing) return incoming; // brand-new field appended by the UI
         if (existing.value === incoming.value) return { ...existing, ...incoming };
 
-        const isSecret = existing.type === 'password' || existing.type === 'pin';
-        const history = isSecret
-          ? [{ value: existing.value, changedAt: existing.updatedAt }, ...(existing.history || [])].slice(
-              0,
-              MAX_PASSWORD_HISTORY,
-            )
-          : existing.history;
-
+        const history = nextHistory(existing, vault.settings.passwordHistoryLimit);
         return updateField(existing, { ...incoming, history });
       });
     }
@@ -378,6 +386,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     }));
     vault = logActivity(touchVault(vault), 'entry.updated', { entryId, title: updatedEntry.title });
     persist();
+    emitVaultEvent('entry.updated', { entryId, title: updatedEntry.title });
     return updatedEntry;
   }
 
@@ -386,24 +395,23 @@ function createVaultService({ vaultFilePath, backupDir }) {
     const located = locateEntry(entryId);
     if (!located) throw new Error('Entry not found');
 
-    const recycled = {
-      id: randomUUID(),
+    const recycled = RecycleBinService.buildRecord({
       type: 'entry',
       item: located.entry,
       categoryId: located.category.id,
       folderId: located.folder.id,
-      deletedAt: new Date().toISOString(),
-    };
+    });
 
     mutateFolder(located.category.id, located.folder.id, (f) => ({
       ...f,
       entries: f.entries.filter((e) => e.id !== entryId),
     }));
-    vault = logActivity(touchVault({ ...vault, recycleBin: [recycled, ...vault.recycleBin] }), 'entry.deleted', {
+    vault = logActivity(RecycleBinService.addRecord(touchVault(vault), recycled), 'entry.deleted', {
       entryId,
       title: located.entry.title,
     });
     persist();
+    emitVaultEvent('entry.deleted', { entryId, title: located.entry.title });
   }
 
   function moveEntry(entryId, targetCategoryId, targetFolderId) {
@@ -419,6 +427,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
 
     vault = logActivity(touchVault(vault), 'entry.moved', { entryId, targetCategoryId, targetFolderId });
     persist();
+    emitVaultEvent('entry.moved', { entryId, targetCategoryId, targetFolderId });
   }
 
   function duplicateEntryById(entryId) {
@@ -429,6 +438,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     mutateFolder(located.category.id, located.folder.id, (f) => ({ ...f, entries: [...f.entries, copy] }));
     vault = logActivity(touchVault(vault), 'entry.duplicated', { entryId, copyId: copy.id });
     persist();
+    emitVaultEvent('entry.duplicated', { entryId, copyId: copy.id });
     return copy;
   }
 
@@ -443,6 +453,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     }));
     vault = touchVault(vault);
     persist();
+    emitVaultEvent('entry.favoriteToggled', { entryId, favorite: updated.favorite });
     return updated;
   }
 
@@ -461,14 +472,27 @@ function createVaultService({ vaultFilePath, backupDir }) {
 
   function listRecentActivity(limit = 20) {
     requireUnlocked();
-    return vault.activityLog.slice(0, limit);
+    return ActivityLogService.list(vault, limit);
+  }
+
+  /**
+   * Records a renderer-side error (from ErrorBoundary) into the activity
+   * log. A no-op while locked - there is no vault to write the entry
+   * into, and errors on the Login/unlock screen aren't worth losing the
+   * user's place over.
+   */
+  function recordError(message, stack) {
+    if (!isUnlocked()) return;
+    vault = logActivity(touchVault(vault), 'app.error', { message, stack });
+    persist();
+    emitVaultEvent('app.error', { message, stack });
   }
 
   // ---- recycle bin ---------------------------------------------------
 
   function restoreFromRecycleBin(recycleId) {
     requireUnlocked();
-    const record = vault.recycleBin.find((r) => r.id === recycleId);
+    const record = RecycleBinService.findRecord(vault, recycleId);
     if (!record) throw new Error('Recycle bin item not found');
 
     if (record.type === 'category') {
@@ -489,27 +513,30 @@ function createVaultService({ vaultFilePath, backupDir }) {
     }
 
     vault = logActivity(
-      touchVault({ ...vault, recycleBin: vault.recycleBin.filter((r) => r.id !== recycleId) }),
+      touchVault(RecycleBinService.removeRecord(vault, recycleId)),
       'recycleBin.restored',
       { recycleId, type: record.type },
     );
     persist();
+    emitVaultEvent('recycleBin.restored', { recycleId, type: record.type });
   }
 
   function permanentlyDelete(recycleId) {
     requireUnlocked();
     vault = logActivity(
-      touchVault({ ...vault, recycleBin: vault.recycleBin.filter((r) => r.id !== recycleId) }),
+      touchVault(RecycleBinService.removeRecord(vault, recycleId)),
       'recycleBin.permanentlyDeleted',
       { recycleId },
     );
     persist();
+    emitVaultEvent('recycleBin.permanentlyDeleted', { recycleId });
   }
 
   function emptyRecycleBin() {
     requireUnlocked();
-    vault = logActivity(touchVault({ ...vault, recycleBin: [] }), 'recycleBin.emptied');
+    vault = logActivity(touchVault(RecycleBinService.clear(vault)), 'recycleBin.emptied');
     persist();
+    emitVaultEvent('recycleBin.emptied');
   }
 
   // ---- settings --------------------------------------------------------
@@ -521,8 +548,9 @@ function createVaultService({ vaultFilePath, backupDir }) {
 
   function updateVaultSettings(updates) {
     requireUnlocked();
-    vault = touchVault({ ...vault, settings: applySettingsUpdate(vault.settings, updates) });
+    vault = touchVault({ ...vault, settings: SettingsService.update(vault.settings, updates) });
     persist();
+    emitVaultEvent('settings.updated');
     return vault.settings;
   }
 
@@ -531,7 +559,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
   function exportVaultTo(destPath) {
     requireUnlocked();
     persist(); // ensure the file on disk reflects the in-memory state first
-    FileService.copyFile(vaultFilePath, destPath);
+    VaultRepository.exportTo(vaultFilePath, destPath);
   }
 
   /**
@@ -540,31 +568,39 @@ function createVaultService({ vaultFilePath, backupDir }) {
    * backed up first so the operation is reversible.
    */
   function importVaultFrom(sourcePath, password) {
-    const envelope = FileService.readVaultFile(sourcePath);
-    const candidateSalt = Buffer.from(envelope.salt, 'base64');
-    const candidateKey = CryptoService.deriveKey(password, candidateSalt);
-    const decrypted = CryptoService.decryptObject(envelope, candidateKey); // throws if wrong password
+    const { vault: decrypted, sessionKey: newKey, salt: newSalt } = VaultRepository.importFrom(
+      sourcePath,
+      password,
+    ); // throws if wrong password
     if (!isVaultValid(decrypted)) {
       throw new Error('Import file is not a valid vault');
     }
 
-    if (vaultFileExists()) {
-      BackupService.createBackup(vaultFilePath, backupDir, decrypted.settings.backupCount || 10);
-    }
-    FileService.copyFile(sourcePath, vaultFilePath);
+    VaultRepository.replaceLiveFile(sourcePath, vaultFilePath, backupDir, decrypted.settings.backupCount || 10);
 
-    salt = candidateSalt;
-    sessionKey = candidateKey;
+    salt = newSalt;
+    sessionKey = newKey;
     vault = logActivity(touchVault(decrypted), 'vault.imported');
     persist();
+    emitVaultEvent('vault.imported');
+  }
+
+  // ---- backups ------------------------------------------------------------
+
+  function listBackups() {
+    return VaultRepository.listBackups(backupDir);
+  }
+
+  function restoreBackup(backupPath) {
+    const keepCount = getSettings().backupCount;
+    VaultRepository.restoreBackup(backupPath, vaultFilePath, backupDir, keepCount);
+    lock();
   }
 
   // ---- search ------------------------------------------------------------
 
   function search(query) {
     requireUnlocked();
-    // eslint-disable-next-line global-require
-    const SearchService = require('./SearchService');
     return SearchService.search(vault, query);
   }
 
@@ -575,6 +611,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     create,
     unlock,
     getVault,
+    restoreSnapshot,
     changeMasterPassword,
     addCategory,
     renameCategory,
@@ -591,6 +628,7 @@ function createVaultService({ vaultFilePath, backupDir }) {
     toggleFavorite,
     listFavorites,
     listRecentActivity,
+    recordError,
     restoreFromRecycleBin,
     permanentlyDelete,
     emptyRecycleBin,
@@ -598,8 +636,8 @@ function createVaultService({ vaultFilePath, backupDir }) {
     updateVaultSettings,
     exportVaultTo,
     importVaultFrom,
+    listBackups,
+    restoreBackup,
     search,
   };
 }
-
-module.exports = { createVaultService };

@@ -1,19 +1,20 @@
-const { randomUUID } = require('crypto');
+import { randomUUID } from 'crypto';
+import { createRequire } from 'module';
+
+// `createRequire` (rather than `import ... with { type: 'json' }`) reads
+// the JSON - CJS `require()` has always supported `.json` natively, and
+// unlike the ESM import-attributes syntax it isn't sensitive to the exact
+// Node minor version. Kept in sync with src/components/EntryForm.jsx,
+// which imports the same file directly (webpack supports JSON imports
+// natively there).
+const require = createRequire(import.meta.url);
+const fieldTypes = require('../data/fieldTypes.json');
 
 // Field types supported across all entry templates.
-const FIELD_TYPES = Object.freeze([
-  'text',
-  'password',
-  'email',
-  'url',
-  'note',
-  'number',
-  'date',
-  'pin',
-]);
+export const FIELD_TYPES = Object.freeze(fieldTypes.types);
 
 // Types that are automatically hidden (masked) by default.
-const AUTO_HIDDEN_TYPES = Object.freeze(['password', 'pin']);
+export const AUTO_HIDDEN_TYPES = Object.freeze(fieldTypes.autoHidden);
 
 /**
  * Creates a Field.
@@ -24,7 +25,7 @@ const AUTO_HIDDEN_TYPES = Object.freeze(['password', 'pin']);
  * @param {boolean} [options.hidden]
  * @returns {Object} Field
  */
-function createField({ label, type = 'text', value = '', hidden } = {}) {
+export function createField({ label, type = 'text', value = '', hidden } = {}) {
   if (!label || typeof label !== 'string') {
     throw new Error('Field requires a non-empty label');
   }
@@ -51,7 +52,7 @@ function createField({ label, type = 'text', value = '', hidden } = {}) {
  * @param {Object} field
  * @param {Object} updates
  */
-function updateField(field, updates = {}) {
+export function updateField(field, updates = {}) {
   const next = { ...field, ...updates };
   if (updates.type && !FIELD_TYPES.includes(updates.type)) {
     throw new Error(`Invalid field type: ${updates.type}`);
@@ -63,7 +64,7 @@ function updateField(field, updates = {}) {
   return next;
 }
 
-function isFieldValid(field) {
+export function isFieldValid(field) {
   return (
     !!field &&
     typeof field.id === 'string' &&
@@ -71,11 +72,3 @@ function isFieldValid(field) {
     FIELD_TYPES.includes(field.type)
   );
 }
-
-module.exports = {
-  FIELD_TYPES,
-  AUTO_HIDDEN_TYPES,
-  createField,
-  updateField,
-  isFieldValid,
-};

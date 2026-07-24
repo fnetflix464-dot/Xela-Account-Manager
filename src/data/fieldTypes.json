@@ -1,0 +1,4 @@
+{
+  "types": ["text", "password", "email", "url", "note", "number", "date", "pin"],
+  "autoHidden": ["password", "pin"]
+}

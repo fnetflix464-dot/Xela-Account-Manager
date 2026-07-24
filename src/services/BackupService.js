@@ -1,7 +1,7 @@
-const path = require('path');
-const FileService = require('./FileService');
+import path from 'path';
+import * as FileService from './FileService.js';
 
-const BACKUP_PREFIX = 'vault-';
+export const BACKUP_PREFIX = 'vault-';
 const BACKUP_SUFFIX = '.xam.bak';
 
 function backupFileName(timestamp = new Date()) {
@@ -18,7 +18,7 @@ function backupFileName(timestamp = new Date()) {
  * @returns {string|null} path of the backup created, or null if there was
  *   nothing to back up yet (first-ever save).
  */
-function createBackup(vaultFilePath, backupDir, keepCount = 10) {
+export function createBackup(vaultFilePath, backupDir, keepCount = 10) {
   if (!FileService.pathExists(vaultFilePath)) {
     return null;
   }
@@ -34,7 +34,7 @@ function createBackup(vaultFilePath, backupDir, keepCount = 10) {
 /**
  * Deletes the oldest backups beyond keepCount.
  */
-function pruneBackups(backupDir, keepCount) {
+export function pruneBackups(backupDir, keepCount) {
   const backups = FileService.listFilesByPrefix(backupDir, BACKUP_PREFIX);
   const excess = backups.length - Math.max(0, keepCount);
   for (let i = 0; i < excess; i += 1) {
@@ -45,7 +45,7 @@ function pruneBackups(backupDir, keepCount) {
 /**
  * Lists available backups, newest first.
  */
-function listBackups(backupDir) {
+export function listBackups(backupDir) {
   return FileService.listFilesByPrefix(backupDir, BACKUP_PREFIX).reverse();
 }
 
@@ -53,18 +53,10 @@ function listBackups(backupDir) {
  * Restores a backup file over the live vault file (also backs up the
  * current live file first, so a bad restore is itself reversible).
  */
-function restoreBackup(backupPath, vaultFilePath, backupDir, keepCount = 10) {
+export function restoreBackup(backupPath, vaultFilePath, backupDir, keepCount = 10) {
   if (!FileService.pathExists(backupPath)) {
     throw new Error('Backup file not found');
   }
   createBackup(vaultFilePath, backupDir, keepCount);
   FileService.copyFile(backupPath, vaultFilePath);
 }
-
-module.exports = {
-  BACKUP_PREFIX,
-  createBackup,
-  pruneBackups,
-  listBackups,
-  restoreBackup,
-};

@@ -2,43 +2,135 @@ import React, { useState } from 'react';
 import '../styles/AccountForm.css';
 import { calculatePasswordStrength } from '../utils/passwordStrength';
 import { generatePassword } from '../utils/passwordGenerator';
+import fieldTypes from '../data/fieldTypes.json';
 
-const FIELD_TYPES = ['text', 'password', 'email', 'url', 'note', 'number', 'date', 'pin'];
-const AUTO_HIDDEN_TYPES = ['password', 'pin'];
+const FIELD_TYPES = fieldTypes.types;
+const AUTO_HIDDEN_TYPES = fieldTypes.autoHidden;
+
+/** Read-only viewer for a secret field's prior values - no restore action. */
+function PasswordHistoryList({ history }) {
+  const [expanded, setExpanded] = useState(false);
+  const [revealedIndexes, setRevealedIndexes] = useState({});
+
+  if (!history || history.length === 0) return null;
+
+  const toggleReveal = (index) => {
+    setRevealedIndexes((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  return (
+    <div className="password-history">
+      <button type="button" className="btn-history-toggle" onClick={() => setExpanded((v) => !v)}>
+        {expanded ? '▾' : '▸'} Previous values ({history.length})
+      </button>
+      {expanded && (
+        <ul className="password-history-list">
+          {history.map((entry, index) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <li key={index}>
+              <span className="password-history-value">
+                {revealedIndexes[index] ? entry.value || '(empty)' : '•'.repeat(Math.max(entry.value.length, 6))}
+              </span>
+              <button
+                type="button"
+                className="btn-reveal"
+                onClick={() => toggleReveal(index)}
+                title={revealedIndexes[index] ? 'Hide' : 'Show'}
+              >
+                {revealedIndexes[index] ? '👁️' : '👁️‍🗨️'}
+              </button>
+              <span className="password-history-date">
+                {entry.changedAt ? new Date(entry.changedAt).toLocaleString() : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// A field's name and type are decided once, here, and never editable
+// afterward - they're the field's identity, not its data. Only the value
+// (and whether it's hidden) can change after creation.
+function AddFieldModal({ onAdd, onCancel }) {
+  const [label, setLabel] = useState('');
+  const [type, setType] = useState('text');
+
+  const submit = () => {
+    if (!label.trim()) return;
+    onAdd(label.trim(), type);
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <button type="button" className="modal-close" onClick={onCancel}>
+          ✕
+        </button>
+        <h3>Add Field</h3>
+        <div className="form-group">
+          <label>Field Name *</label>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="e.g. PIN, Security Question"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submit();
+            }}
+          />
+        </div>
+        <div className="form-group">
+          <label>Type</label>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            {FIELD_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="btn btn-outline" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" disabled={!label.trim()} onClick={submit}>
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
   const [title, setTitle] = useState(entry.title);
   const [tags, setTags] = useState(entry.tags.join(', '));
   const [fields, setFields] = useState(entry.fields.map((f) => ({ ...f })));
+  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
 
   const updateField = (id, updates) => {
-    setFields((prev) =>
-      prev.map((f) => {
-        if (f.id !== id) return f;
-        const next = { ...f, ...updates };
-        if (updates.type) {
-          next.hidden = AUTO_HIDDEN_TYPES.includes(updates.type);
-        }
-        return next;
-      }),
-    );
+    setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
   };
 
   const removeField = (id) => {
     setFields((prev) => prev.filter((f) => f.id !== id));
   };
 
-  const addField = () => {
+  const addField = (label, type) => {
     setFields((prev) => [
       ...prev,
       {
         id: `new-${Date.now()}-${prev.length}`,
-        label: 'New Field',
-        type: 'text',
+        label,
+        type,
         value: '',
-        hidden: false,
+        hidden: AUTO_HIDDEN_TYPES.includes(type),
       },
     ]);
+    setShowAddFieldModal(false);
   };
 
   const fillGeneratedPassword = (id) => {
@@ -87,19 +179,10 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
           return (
             <div className="form-group field-row" key={field.id}>
               <div className="field-row-header">
-                <input
-                  className="field-label-input"
-                  type="text"
-                  value={field.label}
-                  onChange={(e) => updateField(field.id, { label: e.target.value })}
-                />
-                <select value={field.type} onChange={(e) => updateField(field.id, { type: e.target.value })}>
-                  {FIELD_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                <div className="field-label-display">
+                  <span className="field-label-text">{field.label}</span>
+                  <span className="field-type-badge">{field.type}</span>
+                </div>
                 <label className="hidden-checkbox">
                   <input
                     type="checkbox"
@@ -139,11 +222,15 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
                   <span>{strength}</span>
                 </div>
               )}
+
+              {(field.type === 'password' || field.type === 'pin') && (
+                <PasswordHistoryList history={field.history} />
+              )}
             </div>
           );
         })}
 
-        <button type="button" className="btn btn-outline btn-add-field" onClick={addField}>
+        <button type="button" className="btn btn-outline btn-add-field" onClick={() => setShowAddFieldModal(true)}>
           ➕ Add Field
         </button>
 
@@ -156,6 +243,8 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
           </button>
         </div>
       </form>
+
+      {showAddFieldModal && <AddFieldModal onAdd={addField} onCancel={() => setShowAddFieldModal(false)} />}
     </div>
   );
 }
