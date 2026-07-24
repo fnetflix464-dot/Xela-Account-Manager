@@ -1,161 +1,288 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './styles/App.css';
 import Login from './components/Login';
-import AccountList from './components/AccountList';
-import AccountForm from './components/AccountForm';
-import SecurityDashboard from './components/SecurityDashboard';
+import CategoryTree from './components/CategoryTree';
+import EntryList from './components/EntryList';
+import EntryForm from './components/EntryForm';
+import RecycleBin from './components/RecycleBin';
+import ActivityLog from './components/SecurityDashboard';
 import Settings from './components/Settings';
-import TwoFactorSetup from './components/TwoFactorSetup';
-import CategoryFilter from './components/CategoryFilter';
+import { findCategory, findFolder, collectEntries, collectCategoryEntries } from './utils/vaultTree';
+
+const ENTRY_TEMPLATES = [
+  'Login',
+  'Secure Note',
+  'Credit Card',
+  'Bank Account',
+  'License Key',
+  'API Key',
+  'SSH Key',
+  'WiFi',
+  'Custom',
+];
+
+function NewEntryModal({ onCreate, onCancel }) {
+  const [template, setTemplate] = useState('Login');
+  const [title, setTitle] = useState('');
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <button className="modal-close" onClick={onCancel}>
+          ✕
+        </button>
+        <h3>New Entry</h3>
+        <div className="form-group">
+          <label>Template</label>
+          <select value={template} onChange={(e) => setTemplate(e.target.value)}>
+            {ENTRY_TEMPLATES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Title *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. GitHub, Chase Checking"
+            autoFocus
+          />
+        </div>
+        <div className="form-actions">
+          <button className="btn btn-outline" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={!title.trim()}
+            onClick={() => onCreate(template, title.trim())}
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [accounts, setAccounts] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [showForm, setShowForm] = useState(false);
-  const [editingAccount, setEditingAccount] = useState(null);
-  const [activeTab, setActiveTab] = useState('accounts'); // accounts, security, settings
-  const [setupTwoFA, setSetupTwoFA] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedFolderId, setSelectedFolderId] = useState(null);
+  const [activeTab, setActiveTab] = useState('vault');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [showNewEntryModal, setShowNewEntryModal] = useState(false);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Load accounts when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadAccounts();
+  const clearError = () => setError('');
+
+  const loadTree = useCallback(async () => {
+    const result = await window.electron.getVaultTree();
+    if (result.success) {
+      setCategories(result.data);
+      if (!selectedCategoryId && result.data.length > 0) {
+        setSelectedCategoryId(result.data[0].id);
+      }
+    } else {
+      setError(result.error);
     }
+  }, [selectedCategoryId]);
+
+  const loadSettings = useCallback(async () => {
+    const result = await window.electron.getSettings();
+    if (result.success) setSettings(result.data);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    loadTree();
+    loadSettings();
+
+    const unsubscribe = window.electron.onVaultAutoLocked(() => {
+      setIsAuthenticated(false);
+      setCategories([]);
+      setEditingEntry(null);
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  const loadAccounts = async () => {
-    try {
-      setLoading(true);
-      const result = await window.electron.getAccounts();
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthenticated) return undefined;
+    if (!searchTerm.trim()) {
+      setSearchResults(null);
+      return undefined;
+    }
+    window.electron.searchVault(searchTerm).then((result) => {
+      if (cancelled) return;
       if (result.success) {
-        setAccounts(result.data);
+        setSearchResults(result.data.filter((r) => r.type === 'entry').map((r) => r.item));
       }
-    } catch (err) {
-      console.error('Error loading accounts:', err);
-    } finally {
-      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchTerm, isAuthenticated]);
+
+  const handleLoginSuccess = () => setIsAuthenticated(true);
+
+  const handleLock = async () => {
+    await window.electron.lockVault();
+    setIsAuthenticated(false);
+    setCategories([]);
+    setEditingEntry(null);
+  };
+
+  const handleSelectFolder = (categoryId, folderId) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedFolderId(folderId);
+    setSearchTerm('');
+  };
+
+  // ---- categories / folders ----
+
+  const handleAddCategory = async () => {
+    // eslint-disable-next-line no-alert
+    const name = window.prompt('New category name:');
+    if (!name || !name.trim()) return;
+    setLoading(true);
+    const result = await window.electron.addCategory(name.trim(), 'category');
+    setLoading(false);
+    if (result.success) loadTree();
+    else setError(result.error);
+  };
+
+  const handleDeleteCategory = async (categoryId) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Delete this category and everything in it? It will move to the Recycle Bin.')) return;
+    setLoading(true);
+    const result = await window.electron.deleteCategory(categoryId);
+    setLoading(false);
+    if (result.success) {
+      if (selectedCategoryId === categoryId) {
+        setSelectedCategoryId(null);
+        setSelectedFolderId(null);
+      }
+      loadTree();
+    } else setError(result.error);
+  };
+
+  const handleAddFolder = async (categoryId, parentFolderId) => {
+    // eslint-disable-next-line no-alert
+    const name = window.prompt('New folder name:');
+    if (!name || !name.trim()) return;
+    setLoading(true);
+    const result = await window.electron.addFolder(categoryId, parentFolderId, name.trim());
+    setLoading(false);
+    if (result.success) loadTree();
+    else setError(result.error);
+  };
+
+  const handleDeleteFolder = async (categoryId, folderId) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Delete this folder and everything in it? It will move to the Recycle Bin.')) return;
+    setLoading(true);
+    const result = await window.electron.deleteFolder(categoryId, folderId);
+    setLoading(false);
+    if (result.success) {
+      if (selectedFolderId === folderId) setSelectedFolderId(null);
+      loadTree();
+    } else setError(result.error);
+  };
+
+  // ---- entries ----
+
+  const handleCreateEntry = async (template, title) => {
+    if (!selectedCategoryId) return;
+    setLoading(true);
+    const result = await window.electron.addEntry(selectedCategoryId, selectedFolderId, { title, template });
+    setLoading(false);
+    setShowNewEntryModal(false);
+    if (result.success) {
+      await loadTree();
+      setEditingEntry(result.data);
+    } else {
+      setError(result.error);
     }
   };
 
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-  };
-
-  const handleAddAccount = async (accountData) => {
-    try {
-      setLoading(true);
-      const result = await window.electron.addAccount(accountData);
-      if (result.success) {
-        setAccounts([...accounts, result.data]);
-        setShowForm(false);
-        alert('Account added successfully!');
-      } else {
-        alert('Error adding account: ' + result.error);
-      }
-    } catch (err) {
-      alert('Error: ' + err.message);
-    } finally {
-      setLoading(false);
+  const handleSaveEntry = async (updates) => {
+    setLoading(true);
+    const result = await window.electron.updateEntry(editingEntry.id, updates);
+    setLoading(false);
+    if (result.success) {
+      setEditingEntry(null);
+      loadTree();
+    } else {
+      setError(result.error);
     }
   };
 
-  const handleUpdateAccount = async (accountData) => {
-    try {
-      setLoading(true);
-      const result = await window.electron.updateAccount(editingAccount.id, accountData);
-      if (result.success) {
-        setAccounts(accounts.map(acc => acc.id === editingAccount.id ? result.data : acc));
-        setShowForm(false);
-        setEditingAccount(null);
-        alert('Account updated successfully!');
-      } else {
-        alert('Error updating account: ' + result.error);
-      }
-    } catch (err) {
-      alert('Error: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleDeleteEntry = async (entryId) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Delete this entry? It will move to the Recycle Bin.')) return;
+    const result = await window.electron.deleteEntry(entryId);
+    if (result.success) loadTree();
+    else setError(result.error);
   };
 
-  const handleDeleteAccount = async (id) => {
-    if (window.confirm('Are you sure you want to delete this account?')) {
-      try {
-        setLoading(true);
-        const result = await window.electron.deleteAccount(id);
-        if (result.success) {
-          setAccounts(accounts.filter(acc => acc.id !== id));
-          alert('Account deleted successfully!');
-        } else {
-          alert('Error deleting account: ' + result.error);
-        }
-      } catch (err) {
-        alert('Error: ' + err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const handleDuplicateEntry = async (entryId) => {
+    const result = await window.electron.duplicateEntry(entryId);
+    if (result.success) loadTree();
+    else setError(result.error);
   };
 
-  const handleEditAccount = (account) => {
-    setEditingAccount(account);
-    setShowForm(true);
+  const handleToggleFavorite = async (entryId) => {
+    const result = await window.electron.toggleFavorite(entryId);
+    if (result.success) loadTree();
+    else setError(result.error);
   };
 
-  const handleEnable2FA = (account) => {
-    setSetupTwoFA(account);
-  };
+  // ---- derived state ----
 
-  const handle2FAComplete = (result) => {
-    loadAccounts(); // Reload accounts to reflect 2FA status
-    setSetupTwoFA(null);
-    alert('2FA enabled successfully!');
-  };
-
-  const filteredAccounts =
-    selectedCategory === 'all'
-      ? accounts
-      : accounts.filter(acc => acc.category === selectedCategory);
+  const currentFolder = findFolder(categories, selectedCategoryId, selectedFolderId);
+  const currentCategory = findCategory(categories, selectedCategoryId);
+  const visibleEntries = searchResults
+    ? searchResults
+    : currentFolder
+      ? collectEntries(currentFolder)
+      : currentCategory
+        ? collectCategoryEntries(currentCategory)
+        : [];
 
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
-    <div className="app-container">
+    <div className="app">
       <header className="app-header">
-        <div className="header-title">
-          <h1>🔐 Xela Account Manager</h1>
-          <p>Secure account management with 2FA tracking</p>
-        </div>
-        <div className="header-info">
-          <span className="account-count">📋 {accounts.length} accounts</span>
-          <button
-            className="btn-logout"
-            onClick={() => setIsAuthenticated(false)}
-            title="Logout"
-          >
-            🚪 Logout
-          </button>
-        </div>
-      </header>
-
-      <div className="app-content">
-        {/* Navigation Tabs */}
-        <nav className="app-nav">
-          <button
-            className={`nav-tab ${activeTab === 'accounts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('accounts')}
-          >
-            📋 Accounts
+        <h1>🔐 Xela Account Manager</h1>
+        <nav className="nav-tabs">
+          <button className={`nav-tab ${activeTab === 'vault' ? 'active' : ''}`} onClick={() => setActiveTab('vault')}>
+            📋 Vault
           </button>
           <button
-            className={`nav-tab ${activeTab === 'security' ? 'active' : ''}`}
-            onClick={() => setActiveTab('security')}
+            className={`nav-tab ${activeTab === 'recycle' ? 'active' : ''}`}
+            onClick={() => setActiveTab('recycle')}
           >
-            🛡️ Security
+            🗑️ Recycle Bin
+          </button>
+          <button
+            className={`nav-tab ${activeTab === 'activity' ? 'active' : ''}`}
+            onClick={() => setActiveTab('activity')}
+          >
+            🛡️ Activity
           </button>
           <button
             className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
@@ -163,102 +290,89 @@ function App() {
           >
             ⚙️ Settings
           </button>
+          <button className="nav-tab" onClick={handleLock}>
+            🔒 Lock Vault
+          </button>
         </nav>
+      </header>
 
-        {/* Main Content Area */}
-        <main className="main-content">
-          {/* 2FA Setup Modal */}
-          {setupTwoFA && (
-            <div className="modal-overlay">
-              <div className="modal-content">
-                <button
-                  className="modal-close"
-                  onClick={() => setSetupTwoFA(null)}
-                >
-                  ✕
-                </button>
-                <TwoFactorSetup
-                  account={setupTwoFA}
-                  onEnable={handle2FAComplete}
-                  onCancel={() => setSetupTwoFA(null)}
-                />
-              </div>
+      {error && (
+        <div className="error-banner">
+          <span>{error}</span>
+          <button onClick={clearError}>✕</button>
+        </div>
+      )}
+
+      {activeTab === 'vault' && (
+        <div className="main-content">
+          <aside className="sidebar">
+            <CategoryTree
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
+              selectedFolderId={selectedFolderId}
+              onSelectFolder={handleSelectFolder}
+              onAddCategory={handleAddCategory}
+              onAddFolder={handleAddFolder}
+              onDeleteCategory={handleDeleteCategory}
+              onDeleteFolder={handleDeleteFolder}
+            />
+          </aside>
+
+          <main className="main-panel">
+            <div className="panel-header">
+              <h2>{currentFolder ? currentFolder.name : currentCategory ? currentCategory.name : 'Select a category'}</h2>
+              <button
+                className="btn btn-primary"
+                disabled={!selectedCategoryId || loading}
+                onClick={() => setShowNewEntryModal(true)}
+              >
+                ➕ New Entry
+              </button>
             </div>
-          )}
 
-          {/* Accounts Tab */}
-          {activeTab === 'accounts' && (
-            <div className="tab-content">
-              <div className="tab-header">
-                <h2>Your Accounts</h2>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setEditingAccount(null);
-                    setShowForm(true);
-                  }}
-                  disabled={loading}
-                >
-                  ➕ Add New Account
-                </button>
-              </div>
-
-              {/* Account Form */}
-              {showForm && (
-                <div className="form-section">
-                  <AccountForm
-                    account={editingAccount}
-                    onSubmit={editingAccount ? handleUpdateAccount : handleAddAccount}
-                    onCancel={() => {
-                      setShowForm(false);
-                      setEditingAccount(null);
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Category Filter */}
-              <CategoryFilter
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
+            {editingEntry ? (
+              <EntryForm
+                entry={editingEntry}
+                passwordGeneratorSettings={settings ? settings.passwordGenerator : {}}
+                onSubmit={handleSaveEntry}
+                onCancel={() => setEditingEntry(null)}
               />
+            ) : (
+              <EntryList
+                entries={visibleEntries}
+                searchTerm={searchTerm}
+                onSearchTermChange={setSearchTerm}
+                onEdit={setEditingEntry}
+                onDelete={handleDeleteEntry}
+                onDuplicate={handleDuplicateEntry}
+                onToggleFavorite={handleToggleFavorite}
+              />
+            )}
+          </main>
+        </div>
+      )}
 
-              {/* Account List */}
-              {loading && !accounts.length ? (
-                <div className="loading-state">
-                  <p>Loading accounts...</p>
-                </div>
-              ) : (
-                <AccountList
-                  accounts={filteredAccounts}
-                  onEdit={handleEditAccount}
-                  onDelete={handleDeleteAccount}
-                  onEnable2FA={handleEnable2FA}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Security Tab */}
-          {activeTab === 'security' && (
-            <div className="tab-content">
-              <SecurityDashboard />
-            </div>
-          )}
-
-          {/* Settings Tab */}
-          {activeTab === 'settings' && (
-            <div className="tab-content">
-              <Settings />
-            </div>
-          )}
+      {activeTab === 'recycle' && (
+        <main className="main-panel">
+          <RecycleBin onChanged={loadTree} />
         </main>
-      </div>
+      )}
 
-      {/* Footer */}
-      <footer className="app-footer">
-        <p>🔒 All data is encrypted with AES-256 • Master password protected</p>
-      </footer>
+      {activeTab === 'activity' && (
+        <main className="main-panel">
+          <ActivityLog />
+        </main>
+      )}
+
+      {activeTab === 'settings' && (
+        <main className="main-panel">
+          <Settings onSettingsChanged={setSettings} />
+        </main>
+      )}
+
+      {showNewEntryModal && (
+        <NewEntryModal onCreate={handleCreateEntry} onCancel={() => setShowNewEntryModal(false)} />
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/Login.css';
+import { calculatePasswordStrength } from '../utils/passwordStrength';
 
 function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
@@ -16,7 +17,7 @@ function Login({ onLoginSuccess }) {
   const checkMasterPasswordExists = async () => {
     try {
       const result = await window.electron.checkMasterPasswordExists();
-      setMode(result.exists ? 'verify' : 'setup');
+      setMode(result.success && result.data.exists ? 'verify' : 'setup');
       setLoading(false);
     } catch (err) {
       setError('Error checking authentication status');
@@ -24,22 +25,11 @@ function Login({ onLoginSuccess }) {
     }
   };
 
-  const validatePasswordStrength = async (pwd) => {
-    if (pwd) {
-      try {
-        const result = await window.electron.validatePasswordStrength(pwd);
-        setPasswordStrength(result.strength);
-      } catch (err) {
-        console.error('Error validating password:', err);
-      }
-    }
-  };
-
   const handlePasswordChange = (e) => {
     const pwd = e.target.value;
     setPassword(pwd);
     if (mode === 'setup') {
-      validatePasswordStrength(pwd);
+      setPasswordStrength(calculatePasswordStrength(pwd));
     }
   };
 
