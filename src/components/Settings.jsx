@@ -589,7 +589,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
       <div className="settings-section">
         <h3>About</h3>
         <p className="hint">Xela Account Manager</p>
-        <p className="hint">Created by Alex Botones</p>
+        <p className="hint">© Alex B.</p>
       </div>
 
       {saved && <div className="success-message">Saved successfully</div>}
