@@ -183,17 +183,24 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
                   <span className="field-label-text">{field.label}</span>
                   <span className="field-type-badge">{field.type}</span>
                 </div>
-                <label className="hidden-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={field.hidden}
-                    onChange={(e) => updateField(field.id, { hidden: e.target.checked })}
-                  />
-                  Hidden
-                </label>
-                <button type="button" className="btn-remove-field" onClick={() => removeField(field.id)} title="Remove field">
-                  ✕
-                </button>
+                <div className="field-row-header-end">
+                  <label className="hidden-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={field.hidden}
+                      onChange={(e) => updateField(field.id, { hidden: e.target.checked })}
+                    />
+                    Hidden
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-remove-field"
+                    onClick={() => removeField(field.id)}
+                    title="Remove field"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               {field.type === 'note' ? (

@@ -110,9 +110,16 @@ code {
 }
 
 /* Shared button primitives used across components (App, EntryList,
-   EntryForm, CategoryTree, RecycleBin, Settings...). Individual
-   components add their own modifiers (.btn-primary, .btn-danger, etc.)
-   in their own stylesheets; this just gives every button a sane base. */
+   EntryForm, CategoryTree, RecycleBin, Settings...).
+   Every solid-background button (.btn-primary/.btn-success/.btn-danger/
+   .btn-secondary all included, via this shared base) uses the same
+   neutral gray - color no longer signals which action a button performs
+   (success/danger/primary all used to be different bright colors,
+   inconsistent with each other and inconsistent about what "red" or
+   "green" meant from one screen to the next). Buttons that are
+   deliberately colorless (.btn-outline, .btn-link, .btn-card-action) are
+   untouched - only ones that already had a solid color moved to this
+   shared gray. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -124,12 +131,12 @@ code {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: var(--color-primary);
+  background: #6b7280;
   color: white;
 }
 
 .btn:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.1);
 }
 
 .btn:disabled {
@@ -150,18 +157,6 @@ code {
 
 .btn-outline:hover {
   background: var(--color-bg-surface-alt);
-}
-
-.btn-success {
-  background: #10b981;
-}
-
-.btn-danger {
-  background: #ef4444;
-}
-
-.btn-secondary {
-  background: #6b7280;
 }
 
 .loading-state {
