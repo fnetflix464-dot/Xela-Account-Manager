@@ -2,6 +2,21 @@ import React, { useState, useEffect, useCallback } from 'react';
 import '../styles/Settings.css';
 import { resizeImageToDataUrl } from '../utils/imageResize';
 
+// Turns "vault-2026-07-24T15-10-27-131Z.xam.bak" into a readable local
+// date/time; falls back to the raw label (e.g. a custom rename) when the
+// filename isn't the auto-generated timestamp format.
+function backupLabel(path) {
+  const filename = path.split(/[\\/]/).pop();
+  const match = filename.match(/^vault-(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.xam\.bak$/);
+  if (match) {
+    const date = new Date(`${match[1]}:${match[2]}:${match[3]}.${match[4]}Z`);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+  }
+  return filename.replace(/^vault-/, '').replace(/\.xam\.bak$/, '');
+}
+
 function ColorPickerField({ label, value, fallback, onChange, hint }) {
   return (
     <div className="setting-item">
@@ -423,9 +438,9 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
         {backups.length === 0 ? (
           <p className="hint">No backups yet — one is made automatically every time the vault saves.</p>
         ) : (
-          <ul>
+          <ul className="backup-rows">
             {backups.slice(0, 20).map((path) => (
-              <li key={path}>
+              <li key={path} className="backup-row">
                 {renamingPath === path ? (
                   <>
                     <input
@@ -438,29 +453,35 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
                         if (e.key === 'Enter') handleConfirmRename();
                         if (e.key === 'Escape') setRenamingPath(null);
                       }}
-                    />{' '}
-                    <button className="btn btn-sm btn-primary" disabled={!renameValue.trim()} onClick={handleConfirmRename}>
-                      Save
-                    </button>{' '}
-                    <button className="btn btn-sm btn-outline" onClick={() => setRenamingPath(null)}>
-                      Cancel
-                    </button>
+                    />
+                    <div className="backup-row-actions">
+                      <button className="btn-card-action" disabled={!renameValue.trim()} onClick={handleConfirmRename}>
+                        Save
+                      </button>
+                      <button className="btn-card-action" onClick={() => setRenamingPath(null)}>
+                        Cancel
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <>
-                    {path.split(/[\\/]/).pop()}{' '}
-                    <button className="btn btn-sm btn-outline" onClick={() => handleRestoreBackup(path)}>
-                      Restore
-                    </button>{' '}
-                    <button className="btn btn-sm btn-outline" onClick={() => handleStartRename(path)}>
-                      Rename
-                    </button>{' '}
-                    <button className="btn btn-sm btn-outline" onClick={() => handleExportBackup(path)}>
-                      Export
-                    </button>{' '}
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteBackup(path)}>
-                      Delete
-                    </button>
+                    <span className="backup-row-label" title={path}>
+                      {backupLabel(path)}
+                    </span>
+                    <div className="backup-row-actions">
+                      <button className="btn-card-action" onClick={() => handleRestoreBackup(path)}>
+                        Restore
+                      </button>
+                      <button className="btn-card-action" onClick={() => handleStartRename(path)}>
+                        Rename
+                      </button>
+                      <button className="btn-card-action" onClick={() => handleExportBackup(path)}>
+                        Export
+                      </button>
+                      <button className="btn-card-action danger" onClick={() => handleDeleteBackup(path)}>
+                        Delete
+                      </button>
+                    </div>
                   </>
                 )}
               </li>

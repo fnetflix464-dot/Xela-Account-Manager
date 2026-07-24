@@ -290,6 +290,16 @@
   color: #ef4444;
 }
 
+.btn-card-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-card-action:disabled:hover {
+  background: transparent;
+  color: var(--color-text-faint);
+}
+
 @media (max-width: 768px) {
   .accounts-grid {
     grid-template-columns: 1fr;
