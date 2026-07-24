@@ -289,50 +289,6 @@
   color: #ef4444;
 }
 
-.btn {
-  flex: 1;
-  min-width: 80px;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-sm {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-}
-
-.btn-success {
-  background: #10b981;
-  color: white;
-}
-
-.btn-success:hover {
-  background: #059669;
-}
-
-.btn-danger {
-  background: #ef4444;
-  color: white;
-}
-
-.btn-danger:hover {
-  background: #dc2626;
-}
-
 @media (max-width: 768px) {
   .accounts-grid {
     grid-template-columns: 1fr;
@@ -340,9 +296,5 @@
 
   .card-actions {
     flex-direction: column;
-  }
-
-  .btn {
-    min-width: unset;
   }
 }
