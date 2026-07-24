@@ -48,3 +48,64 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* Shared button primitives used across components (App, EntryList,
+   EntryForm, CategoryTree, RecycleBin, Settings...). Individual
+   components add their own modifiers (.btn-primary, .btn-danger, etc.)
+   in their own stylesheets; this just gives every button a sane base. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #667eea;
+  color: white;
+}
+
+.btn:hover {
+  filter: brightness(1.05);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.btn-outline:hover {
+  background: #f3f4f6;
+}
+
+.btn-success {
+  background: #10b981;
+}
+
+.btn-danger {
+  background: #ef4444;
+}
+
+.btn-secondary {
+  background: #6b7280;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #6b7280;
+}

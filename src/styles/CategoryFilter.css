@@ -93,3 +93,57 @@
     display: none;
   }
 }
+
+/* --- Tree additions (nested folders under categories) --- */
+
+.tree-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-toggle {
+  display: inline-block;
+  width: 14px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-node-actions {
+  display: none;
+  gap: 0.5rem;
+  padding: 0 1rem 0.5rem 2.5rem;
+}
+
+.tree-node:hover > .tree-node-actions {
+  display: flex;
+}
+
+.tree-action-btn {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: #374151;
+}
+
+.tree-action-btn:hover {
+  background: #e5e7eb;
+}
+
+.tree-action-btn.danger:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.tree-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.btn-add-category {
+  margin-top: 1rem;
+  width: 100%;
+}
