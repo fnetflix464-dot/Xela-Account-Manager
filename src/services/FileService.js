@@ -49,9 +49,21 @@ export function readVaultFile(filePath) {
 }
 
 /**
- * Writes the vault envelope to disk atomically: writes to a temp file in
- * the same directory, then renames over the target. This avoids leaving
- * a truncated/corrupted vault.xam if the process dies mid-write.
+ * Writes the vault envelope to disk atomically:
+ *
+ *   vault.tmp -> write -> fsync -> rename -> vault.xam
+ *
+ * The fsync is the step that actually matters for crash/power-loss
+ * safety: `writeFileSync` alone only guarantees the data has been handed
+ * to the OS, not that it has physically reached disk - without an
+ * explicit fsync, a power loss between the write and the rename could
+ * still leave the temp file (and thus a subsequent rename) holding
+ * incomplete data. Renaming over the target is itself atomic at the
+ * filesystem level (on both NTFS and POSIX filesystems), so once the
+ * synced temp file is renamed, vault.xam is never observed in a
+ * partially-written state - a crash either leaves the *previous*
+ * vault.xam intact, or the *new*, fully-synced one; never a truncated
+ * file in between.
  * @param {string} filePath
  * @param {{ salt: string, iv: string, authTag: string, ciphertext: string }} envelope
  */
@@ -68,7 +80,16 @@ export function writeVaultFile(filePath, envelope) {
   };
 
   const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(payload), { encoding: 'utf8', mode: 0o600 });
+  const fd = fs.openSync(tempPath, 'w', 0o600);
+  try {
+    fs.writeSync(fd, JSON.stringify(payload), 0, 'utf8');
+    fs.fsyncSync(fd);
+  } catch (err) {
+    fs.closeSync(fd);
+    deleteFile(tempPath);
+    throw err;
+  }
+  fs.closeSync(fd);
   fs.renameSync(tempPath, filePath);
 }
 
