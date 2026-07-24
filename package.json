@@ -5,6 +5,7 @@
   "homepage": "./",
   "private": true,
   "author": "fnetflix464-dot",
+  "license": "MIT",
   "main": "public/electron.js",
   "dependencies": {
     "react": "^18.2.0",
