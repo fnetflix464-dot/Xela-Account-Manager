@@ -4,6 +4,11 @@ const MIN_PASSWORD_LENGTH = 6;
 const MAX_PASSWORD_LENGTH = 128;
 const MIN_BACKUP_COUNT = 1;
 const MAX_BACKUP_COUNT = 100;
+// Generous but bounded - the renderer resizes/compresses images before
+// setting this, so a legitimate value is normally well under 1MB; this
+// cap just stops the settings blob from growing unbounded if that
+// resize step is ever bypassed.
+const MAX_BACKGROUND_IMAGE_LENGTH = 4 * 1024 * 1024;
 
 /**
  * Validates a fully-resolved Settings object, throwing a clear Error on
@@ -59,6 +64,14 @@ export function validate(settings) {
   if (settings.accentColor !== null && typeof settings.accentColor !== 'undefined') {
     if (typeof settings.accentColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(settings.accentColor)) {
       throw new Error('Accent color must be a 6-digit hex color (e.g. #667eea) or null');
+    }
+  }
+  if (settings.backgroundImage !== null && typeof settings.backgroundImage !== 'undefined') {
+    if (typeof settings.backgroundImage !== 'string' || !settings.backgroundImage.startsWith('data:image/')) {
+      throw new Error('Background image must be an image data URI or null');
+    }
+    if (settings.backgroundImage.length > MAX_BACKGROUND_IMAGE_LENGTH) {
+      throw new Error('Background image is too large');
     }
   }
 }

@@ -87,6 +87,23 @@
   background: none;
 }
 
+.background-image-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.background-image-preview {
+  display: block;
+  margin-top: 0.75rem;
+  max-width: 240px;
+  max-height: 120px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+
 .hint {
   font-size: 0.9rem;
   color: var(--color-text-muted);

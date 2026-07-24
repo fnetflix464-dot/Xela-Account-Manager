@@ -429,7 +429,19 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={
+        settings && settings.backgroundImage
+          ? {
+              backgroundImage: `url(${settings.backgroundImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundAttachment: 'fixed',
+            }
+          : undefined
+      }
+    >
       <header className="app-header">
         <div className="app-header-top">
           <h1>Xela Account Manager</h1>

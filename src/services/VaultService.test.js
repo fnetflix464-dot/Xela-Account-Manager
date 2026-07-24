@@ -610,6 +610,21 @@ describe('settings validation', () => {
     expect(() => svc.updateVaultSettings({ accentColor: 'blue' })).toThrow(/hex color/i);
     expect(() => svc.updateVaultSettings({ accentColor: '#fff' })).toThrow(/hex color/i);
   });
+
+  test('backgroundImage defaults to null, accepts a data URI, and rejects non-image values', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(svc.getSettings().backgroundImage).toBeNull();
+
+    const dataUri = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+    const after = svc.updateVaultSettings({ backgroundImage: dataUri });
+    expect(after.backgroundImage).toBe(dataUri);
+
+    expect(() => svc.updateVaultSettings({ backgroundImage: 'not-a-data-uri' })).toThrow(/data uri/i);
+    expect(() =>
+      svc.updateVaultSettings({ backgroundImage: `data:image/jpeg;base64,${'a'.repeat(5 * 1024 * 1024)}` }),
+    ).toThrow(/too large/i);
+  });
 });
 
 describe('search', () => {

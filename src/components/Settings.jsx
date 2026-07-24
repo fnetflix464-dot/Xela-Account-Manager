@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import '../styles/Settings.css';
+import { resizeImageToDataUrl } from '../utils/imageResize';
 
 function Settings({ onSettingsChanged }) {
   const [settings, setSettings] = useState(null);
@@ -54,6 +55,28 @@ function Settings({ onSettingsChanged }) {
   const handleAccentColorChange = (value) => {
     setSettings((prev) => {
       const next = { ...prev, accentColor: value };
+      onSettingsChanged(next);
+      return next;
+    });
+  };
+
+  const handleBackgroundImageChange = async (file) => {
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      setSettings((prev) => {
+        const next = { ...prev, backgroundImage: dataUrl };
+        onSettingsChanged(next);
+        return next;
+      });
+    } catch (err) {
+      setError(err.message || 'Could not use that image');
+    }
+  };
+
+  const handleRemoveBackgroundImage = () => {
+    setSettings((prev) => {
+      const next = { ...prev, backgroundImage: null };
       onSettingsChanged(next);
       return next;
     });
@@ -229,6 +252,24 @@ function Settings({ onSettingsChanged }) {
               </button>
             )}
           </div>
+        </div>
+        <div className="setting-item">
+          <label>Background image</label>
+          <p className="hint">
+            Optional - shown behind the vault view. Off by default. Resized/compressed automatically before
+            saving.
+          </p>
+          <div className="background-image-picker">
+            <input type="file" accept="image/*" onChange={(e) => handleBackgroundImageChange(e.target.files[0])} />
+            {settings.backgroundImage && (
+              <button type="button" className="btn-link" onClick={handleRemoveBackgroundImage}>
+                Remove background image
+              </button>
+            )}
+          </div>
+          {settings.backgroundImage && (
+            <img src={settings.backgroundImage} alt="Background preview" className="background-image-preview" />
+          )}
         </div>
       </div>
 

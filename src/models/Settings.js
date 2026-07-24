@@ -37,6 +37,9 @@ export function createSettings(overrides = {}) {
     // accent is an override on top of the light/dark palette, not a
     // replacement for it.
     accentColor: typeof overrides.accentColor === 'string' ? overrides.accentColor : null,
+    // Opt-in only, off (null) by default - a base64 data URI (already
+    // resized/compressed by the renderer before it ever reaches here).
+    backgroundImage: typeof overrides.backgroundImage === 'string' ? overrides.backgroundImage : null,
   };
 }
 
