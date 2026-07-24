@@ -18,6 +18,11 @@ contextBridge.exposeInMainWorld('electron', {
   lockVault: () => ipcRenderer.invoke('lock-vault'),
   changeMasterPassword: (currentPassword, newPassword) =>
     ipcRenderer.invoke('change-master-password', currentPassword, newPassword),
+  isQuickUnlockAvailable: () => ipcRenderer.invoke('is-quick-unlock-available'),
+  isQuickUnlockEnabled: () => ipcRenderer.invoke('is-quick-unlock-enabled'),
+  enableQuickUnlock: (pin) => ipcRenderer.invoke('enable-quick-unlock', pin),
+  disableQuickUnlock: () => ipcRenderer.invoke('disable-quick-unlock'),
+  unlockWithPin: (pin) => ipcRenderer.invoke('unlock-with-pin', pin),
   // Generalized push channel for domain events (category/folder/entry
   // mutations, vault lifecycle transitions) - callback receives
   // { action, details, timestamp }.

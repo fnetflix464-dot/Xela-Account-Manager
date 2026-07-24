@@ -154,6 +154,33 @@ describe('readVaultFile', () => {
   });
 });
 
+describe('writeJsonFileAtomic / readJsonFile', () => {
+  test('round-trips arbitrary JSON data', () => {
+    const dir = tempDir();
+    const filePath = path.join(dir, 'quickunlock.json');
+    FileService.writeJsonFileAtomic(filePath, { pin: true, nested: { a: 1 } });
+    expect(FileService.readJsonFile(filePath)).toEqual({ pin: true, nested: { a: 1 } });
+  });
+
+  test('readJsonFile returns null (never throws) for a missing file', () => {
+    const dir = tempDir();
+    expect(FileService.readJsonFile(path.join(dir, 'missing.json'))).toBeNull();
+  });
+
+  test('readJsonFile returns null (never throws) for invalid JSON', () => {
+    const dir = tempDir();
+    const filePath = path.join(dir, 'bad.json');
+    fs.writeFileSync(filePath, 'not json{{{');
+    expect(FileService.readJsonFile(filePath)).toBeNull();
+  });
+
+  test('leaves no leftover .tmp file after a successful write', () => {
+    const dir = tempDir();
+    FileService.writeJsonFileAtomic(path.join(dir, 'quickunlock.json'), { a: 1 });
+    expect(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+  });
+});
+
 describe('isVaultFileStructurallyValid', () => {
   test('returns true for a well-formed vault envelope', () => {
     const dir = tempDir();

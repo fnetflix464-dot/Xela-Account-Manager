@@ -14,6 +14,36 @@ function createTestService() {
   });
 }
 
+// See QuickUnlockService.test.js for why safeStorage needs a fake under Jest.
+function createFakeSafeStorage({ available = true } = {}) {
+  const store = new Map();
+  let counter = 0;
+  return {
+    isEncryptionAvailable: () => available,
+    encryptString: (plaintext) => {
+      const id = `enc-${counter++}`;
+      store.set(id, plaintext);
+      return Buffer.from(id, 'utf8');
+    },
+    decryptString: (buf) => {
+      const id = buf.toString('utf8');
+      if (!store.has(id)) throw new Error('unknown ciphertext');
+      return store.get(id);
+    },
+  };
+}
+
+function createTestServiceWithQuickUnlock(safeStorageOverrides) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xela-vs-test-'));
+  const svc = createVaultService({
+    vaultFilePath: path.join(dir, 'vault.xam'),
+    backupDir: path.join(dir, 'backups'),
+    quickUnlockFilePath: path.join(dir, 'quickunlock.dat'),
+    safeStorage: createFakeSafeStorage(safeStorageOverrides),
+  });
+  return svc;
+}
+
 // EventBus is a shared, module-level singleton (by design - see
 // src/services/EventBus.js). Each test that inspects emitted events must
 // remove its own listener afterward or later tests would double-count.
@@ -68,6 +98,74 @@ describe('vault lifecycle', () => {
     expect(() => svc.unlock('old-password-123')).toThrow();
     svc.unlock('new-password-123');
     expect(svc.isUnlocked()).toBe(true);
+  });
+});
+
+describe('PIN quick unlock', () => {
+  test('is unavailable/disabled by default when no quickUnlockFilePath/safeStorage is configured', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    expect(svc.isQuickUnlockAvailable()).toBe(false);
+    expect(svc.isQuickUnlockEnabled()).toBe(false);
+    expect(() => svc.enableQuickUnlock('1234')).toThrow(/not configured/i);
+  });
+
+  test('enable then unlockWithPin unlocks the vault without the master password', () => {
+    const svc = createTestServiceWithQuickUnlock();
+    svc.create('supersecretpassword');
+    svc.addCategory('Personal', 'category');
+    svc.enableQuickUnlock('4242');
+    svc.lock();
+
+    expect(svc.isUnlocked()).toBe(false);
+    expect(svc.unlockWithPin('4242')).toBe(true);
+    expect(svc.isUnlocked()).toBe(true);
+    expect(svc.getVault().categories).toHaveLength(1);
+  });
+
+  test('unlockWithPin rejects the wrong PIN and leaves the vault locked', () => {
+    const svc = createTestServiceWithQuickUnlock();
+    svc.create('supersecretpassword');
+    svc.enableQuickUnlock('4242');
+    svc.lock();
+
+    expect(() => svc.unlockWithPin('0000')).toThrow(/incorrect pin/i);
+    expect(svc.isUnlocked()).toBe(false);
+  });
+
+  test('disableQuickUnlock removes it and unlockWithPin then fails', () => {
+    const svc = createTestServiceWithQuickUnlock();
+    svc.create('supersecretpassword');
+    svc.enableQuickUnlock('4242');
+    svc.disableQuickUnlock();
+    svc.lock();
+
+    expect(svc.isQuickUnlockEnabled()).toBe(false);
+    expect(() => svc.unlockWithPin('4242')).toThrow(/not set up/i);
+  });
+
+  test('changing the master password invalidates a previously enabled quick unlock', () => {
+    const svc = createTestServiceWithQuickUnlock();
+    svc.create('old-password-123');
+    svc.enableQuickUnlock('4242');
+    expect(svc.isQuickUnlockEnabled()).toBe(true);
+
+    svc.changeMasterPassword('old-password-123', 'new-password-123');
+    expect(svc.isQuickUnlockEnabled()).toBe(false);
+
+    svc.lock();
+    expect(() => svc.unlockWithPin('4242')).toThrow(/not set up/i);
+  });
+
+  test('restoring a backup invalidates a previously enabled quick unlock', () => {
+    const svc = createTestServiceWithQuickUnlock();
+    svc.create('supersecretpassword');
+    svc.addCategory('Personal', 'category'); // triggers a backup
+    svc.enableQuickUnlock('4242');
+    const [backupPath] = svc.listBackups();
+
+    svc.restoreBackup(backupPath);
+    expect(svc.isQuickUnlockEnabled()).toBe(false);
   });
 });
 

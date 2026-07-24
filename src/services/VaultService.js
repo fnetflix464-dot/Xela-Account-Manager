@@ -3,6 +3,7 @@ import * as SearchService from './SearchService.js';
 import * as ActivityLogService from './ActivityLogService.js';
 import * as RecycleBinService from './RecycleBinService.js';
 import * as SettingsService from './SettingsService.js';
+import * as QuickUnlockService from './QuickUnlockService.js';
 import { emitVaultEvent } from './EventBus.js';
 
 import { createVault, touchVault, isVaultValid } from '../models/Vault.js';
@@ -20,10 +21,20 @@ const logActivity = ActivityLogService.record;
  * never on disk in plaintext). It is instantiated once per app run in the
  * Electron main process.
  */
-export function createVaultService({ vaultFilePath, backupDir }) {
+export function createVaultService({ vaultFilePath, backupDir, quickUnlockFilePath, safeStorage }) {
   let sessionKey = null; // Buffer - derived AES key, present only while unlocked
   let salt = null; // Buffer - PBKDF2 salt read from / written to the vault file
   let vault = null; // decrypted Vault object, present only while unlocked
+
+  // Any operation that changes what key material is actually correct for
+  // vaultFilePath must invalidate a previously-saved quick unlock entry -
+  // otherwise it would silently unwrap a key that no longer matches the
+  // live vault. VaultRepository.loadWithKey's salt check is a backstop
+  // for this, but disabling proactively gives a clearer "set it up again"
+  // outcome instead of leaning on that backstop by default.
+  function invalidateQuickUnlock() {
+    if (quickUnlockFilePath) QuickUnlockService.disable(quickUnlockFilePath);
+  }
 
   // ---- session -------------------------------------------------------
 
@@ -126,6 +137,49 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     return true;
   }
 
+  // ---- PIN quick unlock ------------------------------------------------
+  // See QuickUnlockService.js for the security model - the master
+  // password stays the real key; this only wraps the already-derived
+  // session key behind the OS credential store, gated by a locally
+  // checked PIN.
+
+  function isQuickUnlockAvailable() {
+    return QuickUnlockService.isAvailable(safeStorage);
+  }
+
+  function isQuickUnlockEnabled() {
+    return !!quickUnlockFilePath && QuickUnlockService.isEnabled(quickUnlockFilePath);
+  }
+
+  function enableQuickUnlock(pin) {
+    requireUnlocked();
+    if (!quickUnlockFilePath) throw new Error('Quick unlock is not configured');
+    QuickUnlockService.enable(quickUnlockFilePath, safeStorage, pin, sessionKey, salt);
+  }
+
+  function disableQuickUnlock() {
+    if (quickUnlockFilePath) QuickUnlockService.disable(quickUnlockFilePath);
+  }
+
+  function unlockWithPin(pin) {
+    if (!quickUnlockFilePath) throw new Error('Quick unlock is not configured');
+    const { sessionKey: recoveredKey, salt: recoveredSalt } = QuickUnlockService.unlock(
+      quickUnlockFilePath,
+      safeStorage,
+      pin,
+    );
+    const { vault: decrypted } = VaultRepository.loadWithKey(vaultFilePath, recoveredKey, recoveredSalt);
+    if (!isVaultValid(decrypted)) {
+      throw new Error('Vault file is corrupted');
+    }
+
+    salt = recoveredSalt;
+    sessionKey = recoveredKey;
+    vault = decrypted;
+    emitVaultEvent('vault.unlocked');
+    return true;
+  }
+
   function getVault() {
     requireUnlocked();
     return vault;
@@ -157,6 +211,7 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     sessionKey = newKey;
     vault = logActivity(touchVault(vault), 'vault.masterPasswordChanged');
     persist();
+    invalidateQuickUnlock();
     emitVaultEvent('vault.masterPasswordChanged');
     return true;
   }
@@ -663,6 +718,7 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     sessionKey = newKey;
     vault = logActivity(touchVault(decrypted), 'vault.imported');
     persist();
+    invalidateQuickUnlock();
     emitVaultEvent('vault.imported');
   }
 
@@ -680,6 +736,7 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     const keepCount = isUnlocked() ? getSettings().backupCount : 10;
     VaultRepository.restoreBackup(backupPath, vaultFilePath, backupDir, keepCount);
     if (isUnlocked()) lock();
+    invalidateQuickUnlock();
   }
 
   // Backup-file management is deliberately independent of vault lock
@@ -711,6 +768,11 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     lock,
     create,
     unlock,
+    isQuickUnlockAvailable,
+    isQuickUnlockEnabled,
+    enableQuickUnlock,
+    disableQuickUnlock,
+    unlockWithPin,
     getVault,
     restoreSnapshot,
     changeMasterPassword,

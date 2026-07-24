@@ -14,6 +14,9 @@ function Login({ onLoginSuccess }) {
   const [backups, setBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [quickUnlockEnabled, setQuickUnlockEnabled] = useState(false);
+  const [usePin, setUsePin] = useState(false);
+  const [pin, setPin] = useState('');
 
   useEffect(() => {
     checkVaultStatus();
@@ -41,7 +44,15 @@ function Login({ onLoginSuccess }) {
         return;
       }
       const result = await window.electron.checkMasterPasswordExists();
-      setMode(result.success && result.data.exists ? 'verify' : 'setup');
+      const exists = result.success && result.data.exists;
+      setMode(exists ? 'verify' : 'setup');
+
+      if (exists) {
+        const quickUnlock = await window.electron.isQuickUnlockEnabled();
+        const enabled = quickUnlock.success && quickUnlock.data.enabled;
+        setQuickUnlockEnabled(enabled);
+        setUsePin(enabled);
+      }
       setLoading(false);
     } catch (err) {
       setError('Error checking authentication status');
@@ -110,6 +121,31 @@ function Login({ onLoginSuccess }) {
       } else {
         setError('Invalid master password');
         setPassword('');
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePinSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!pin) {
+      setError('Please enter your PIN');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await window.electron.unlockWithPin(pin);
+      if (result.success) {
+        onLoginSuccess();
+      } else {
+        setError(result.error || 'Incorrect PIN');
+        setPin('');
       }
     } catch (err) {
       setError(err.message || 'An error occurred');
@@ -262,6 +298,58 @@ function Login({ onLoginSuccess }) {
     );
   }
 
+  if (mode === 'verify' && usePin) {
+    return (
+      <div className="login-container">
+        <div className="login-box">
+          <div className="login-header">
+            <h1>Xela Account Manager</h1>
+            <p>Unlock Your Accounts</p>
+          </div>
+
+          <form onSubmit={handlePinSubmit}>
+            <div className="form-group">
+              <label htmlFor="pin">PIN</label>
+              <input
+                id="pin"
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={12}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="Enter your PIN"
+                disabled={loading}
+                autoFocus
+                required
+              />
+            </div>
+
+            {error && <div className="error-message">{error}</div>}
+
+            <button type="submit" className="btn btn-primary btn-large" disabled={loading}>
+              {loading ? 'Processing...' : 'Unlock'}
+            </button>
+          </form>
+
+          <div className="login-footer">
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                setError('');
+                setPin('');
+                setUsePin(false);
+              }}
+            >
+              Use master password instead
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (mode === 'import') {
     return (
       <div className="login-container">
@@ -402,6 +490,18 @@ function Login({ onLoginSuccess }) {
           >
             {mode === 'setup' ? 'Import an existing vault instead' : 'Import a different vault'}
           </button>
+          {mode === 'verify' && quickUnlockEnabled && (
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                setError('');
+                setUsePin(true);
+              }}
+            >
+              Use PIN instead
+            </button>
+          )}
           {mode === 'verify' && (
             <button
               type="button"

@@ -79,6 +79,25 @@ export function load(vaultFilePath, masterPassword) {
 }
 
 /**
+ * Reads + decrypts the vault file using an already-known session key/salt
+ * pair, instead of deriving the key from a password - used by PIN quick
+ * unlock, which recovers the key material a different way. Verifies the
+ * salt matches what's actually in the file first: a mismatch means the
+ * key material is stale (e.g. the master password was changed, or the
+ * vault was restored/imported since), which would otherwise surface as a
+ * confusing generic decrypt failure instead of this specific one.
+ */
+export function loadWithKey(vaultFilePath, sessionKey, salt) {
+  const envelope = FileService.readVaultFile(vaultFilePath);
+  const fileSalt = Buffer.from(envelope.salt, 'base64');
+  if (fileSalt.length !== salt.length || Buffer.compare(fileSalt, salt) !== 0) {
+    throw new Error('Quick unlock data is out of date - unlock with your master password, then re-enable it');
+  }
+  const vault = CryptoService.decryptObject(envelope, sessionKey);
+  return { vault, sessionKey, salt };
+}
+
+/**
  * Copies the live vault file to destPath (export). Assumes the caller has
  * already persisted the latest in-memory state.
  */

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, powerMonitor, safeStorage } = require('electron');
 const isDev = require('electron-is-dev');
 const path = require('path');
 
@@ -40,6 +40,10 @@ function backupDirPath() {
   return path.join(app.getPath('userData'), 'backups');
 }
 
+function quickUnlockFilePath() {
+  return path.join(app.getPath('userData'), 'quickunlock.dat');
+}
+
 async function initializeVaultService() {
   const { createVaultService } = await import('../src/services/VaultService.js');
   const { eventBus, VAULT_EVENT_CHANNEL } = await import('../src/services/EventBus.js');
@@ -50,6 +54,8 @@ async function initializeVaultService() {
   vaultService = createVaultService({
     vaultFilePath: vaultFilePath(),
     backupDir: backupDirPath(),
+    quickUnlockFilePath: quickUnlockFilePath(),
+    safeStorage,
   });
   commandManager = createCommandManager();
   idleLockService = createIdleLockService({ powerMonitor });
@@ -192,6 +198,24 @@ handle('lock-vault', () => {
 handle('change-master-password', (currentPassword, newPassword) =>
   vaultService.changeMasterPassword(currentPassword, newPassword),
 );
+
+// ---- PIN quick unlock ----
+// Callable before any password is entered, same as check-vault-health -
+// the Login screen needs to know whether to show a PIN field at all.
+handle('is-quick-unlock-available', () => ({ available: vaultService.isQuickUnlockAvailable() }));
+handle('is-quick-unlock-enabled', () => ({ enabled: vaultService.isQuickUnlockEnabled() }));
+handle('enable-quick-unlock', (pin) => {
+  vaultService.enableQuickUnlock(pin);
+  return true;
+});
+handle('disable-quick-unlock', () => {
+  vaultService.disableQuickUnlock();
+  return true;
+});
+handle('unlock-with-pin', (pin) => {
+  vaultService.unlockWithPin(pin);
+  return true;
+});
 
 // ==================== CATEGORIES ====================
 

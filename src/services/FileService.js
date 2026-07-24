@@ -117,6 +117,43 @@ export function writeVaultFile(filePath, envelope) {
 }
 
 /**
+ * Generic atomic write for small non-vault JSON files (currently just the
+ * quick-unlock envelope) - same tmp -> fsync -> rename technique as
+ * writeVaultFile, kept separate so that function's vault-specific
+ * envelope shape doesn't need to become generic.
+ * @param {string} filePath
+ * @param {Object} data
+ */
+export function writeJsonFileAtomic(filePath, data) {
+  ensureDir(path.dirname(filePath));
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const fd = fs.openSync(tempPath, 'w', 0o600);
+  try {
+    fs.writeSync(fd, JSON.stringify(data), 0, 'utf8');
+    fs.fsyncSync(fd);
+  } catch (err) {
+    fs.closeSync(fd);
+    deleteFile(tempPath);
+    throw err;
+  }
+  fs.closeSync(fd);
+  fs.renameSync(tempPath, filePath);
+}
+
+/**
+ * Reads and parses a JSON file written by writeJsonFileAtomic. Returns
+ * null (never throws) if the file doesn't exist or isn't valid JSON.
+ */
+export function readJsonFile(filePath) {
+  if (!pathExists(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Copies a file (used for backups and export). Overwrites destination.
  */
 export function copyFile(sourcePath, destPath) {

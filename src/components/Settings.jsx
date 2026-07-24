@@ -12,14 +12,22 @@ function Settings({ onSettingsChanged }) {
   const [importPassword, setImportPassword] = useState('');
   const [renamingPath, setRenamingPath] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [quickUnlockAvailable, setQuickUnlockAvailable] = useState(false);
+  const [quickUnlockEnabled, setQuickUnlockEnabled] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
 
   const load = useCallback(async () => {
-    const [settingsResult, backupsResult] = await Promise.all([
+    const [settingsResult, backupsResult, quickUnlockAvailableResult, quickUnlockEnabledResult] = await Promise.all([
       window.electron.getSettings(),
       window.electron.listBackups(),
+      window.electron.isQuickUnlockAvailable(),
+      window.electron.isQuickUnlockEnabled(),
     ]);
     if (settingsResult.success) setSettings(settingsResult.data);
     if (backupsResult.success) setBackups(backupsResult.data);
+    if (quickUnlockAvailableResult.success) setQuickUnlockAvailable(quickUnlockAvailableResult.data.available);
+    if (quickUnlockEnabledResult.success) setQuickUnlockEnabled(quickUnlockEnabledResult.data.enabled);
   }, []);
 
   useEffect(() => {
@@ -84,6 +92,31 @@ function Settings({ onSettingsChanged }) {
     } else {
       setError(result.error);
     }
+  };
+
+  const handleEnableQuickUnlock = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (newPin !== confirmNewPin) {
+      setError('PINs do not match');
+      return;
+    }
+    const result = await window.electron.enableQuickUnlock(newPin);
+    if (result.success) {
+      setNewPin('');
+      setConfirmNewPin('');
+      setQuickUnlockEnabled(true);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } else {
+      setError(result.error);
+    }
+  };
+
+  const handleDisableQuickUnlock = async () => {
+    const result = await window.electron.disableQuickUnlock();
+    if (result.success) setQuickUnlockEnabled(false);
+    else setError(result.error);
   };
 
   const handleExport = async () => {
@@ -388,6 +421,59 @@ function Settings({ onSettingsChanged }) {
             Change Password
           </button>
         </form>
+      </div>
+
+      <div className="settings-section">
+        <h3>Quick Unlock PIN</h3>
+        {!quickUnlockAvailable ? (
+          <p className="hint">Quick unlock is not available on this system.</p>
+        ) : quickUnlockEnabled ? (
+          <>
+            <p className="hint">
+              A PIN can unlock your vault instead of the master password. Your master password is still
+              the real key - the PIN just unlocks a copy of it that your operating system's own
+              credential store protects.
+            </p>
+            <button type="button" className="btn btn-danger" onClick={handleDisableQuickUnlock}>
+              Disable Quick Unlock
+            </button>
+          </>
+        ) : (
+          <form onSubmit={handleEnableQuickUnlock}>
+            <p className="hint">
+              Set a PIN to unlock your vault without typing the full master password. The master
+              password remains your vault's real encryption key - changing it later automatically
+              turns quick unlock back off.
+            </p>
+            <div className="setting-item">
+              <label>New PIN (4-12 digits)</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={12}
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                required
+              />
+            </div>
+            <div className="setting-item">
+              <label>Confirm PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={12}
+                value={confirmNewPin}
+                onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, ''))}
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-secondary">
+              Enable Quick Unlock
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="settings-section">
