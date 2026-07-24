@@ -269,6 +269,31 @@ describe('category / folder / entry CRUD', () => {
     expect(tree.folders[0].folders[0].entries).toHaveLength(1);
   });
 
+  test('moveFolder with beforeFolderId reorders siblings instead of appending at the end', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    const category = svc.addCategory('Personal', 'category');
+    const a = svc.addFolder(category.id, null, 'A');
+    const b = svc.addFolder(category.id, null, 'B');
+    const c = svc.addFolder(category.id, null, 'C');
+    expect(svc.getVault().categories[0].folders.map((f) => f.name)).toEqual(['A', 'B', 'C']);
+
+    // Move C before B: A, C, B
+    svc.moveFolder(c.id, category.id, null, b.id);
+    expect(svc.getVault().categories[0].folders.map((f) => f.id)).toEqual([a.id, c.id, b.id]);
+  });
+
+  test('moveFolder falls back to appending when beforeFolderId is omitted or not found', () => {
+    const svc = createTestService();
+    svc.create('supersecretpassword');
+    const category = svc.addCategory('Personal', 'category');
+    const a = svc.addFolder(category.id, null, 'A');
+    const b = svc.addFolder(category.id, null, 'B');
+
+    svc.moveFolder(a.id, category.id, null);
+    expect(svc.getVault().categories[0].folders.map((f) => f.id)).toEqual([b.id, a.id]);
+  });
+
   test('duplicateEntryById creates an independent copy with fresh field ids', () => {
     const svc = createTestService();
     svc.create('supersecretpassword');

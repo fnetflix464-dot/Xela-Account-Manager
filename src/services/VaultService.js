@@ -326,12 +326,21 @@ export function createVaultService({ vaultFilePath, backupDir }) {
     emitVaultEvent('folder.deleted', { folderId, name: located.folder.name });
   }
 
-  function moveFolder(folderId, targetCategoryId, targetParentFolderId) {
+  // beforeFolderId, when given, inserts the folder immediately before that
+  // sibling in the target's folder list instead of appending at the end -
+  // this is what makes sibling reordering (not just re-parenting) possible.
+  function moveFolder(folderId, targetCategoryId, targetParentFolderId, beforeFolderId = null) {
     requireUnlocked();
     const located = locateFolder(folderId);
     if (!located) throw new Error('Folder not found');
     const targetCategory = vault.categories.find((c) => c.id === targetCategoryId);
     if (!targetCategory) throw new Error('Target category not found');
+
+    const insertFolder = (siblings) => {
+      const index = beforeFolderId ? siblings.findIndex((f) => f.id === beforeFolderId) : -1;
+      if (index === -1) return [...siblings, located.folder];
+      return [...siblings.slice(0, index), located.folder, ...siblings.slice(index)];
+    };
 
     // remove from current location
     deleteFolderNoRecycle(located.category.id, folderId);
@@ -340,13 +349,13 @@ export function createVaultService({ vaultFilePath, backupDir }) {
       vault = {
         ...vault,
         categories: vault.categories.map((c) =>
-          c.id === targetCategoryId ? { ...c, folders: [...c.folders, located.folder] } : c,
+          c.id === targetCategoryId ? { ...c, folders: insertFolder(c.folders) } : c,
         ),
       };
     } else {
       mutateFolder(targetCategoryId, targetParentFolderId, (f) => ({
         ...f,
-        folders: [...f.folders, located.folder],
+        folders: insertFolder(f.folders),
       }));
     }
 

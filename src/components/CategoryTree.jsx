@@ -16,6 +16,27 @@ function containsFolderId(folder, targetId) {
   return folder.folders.some((f) => containsFolderId(f, targetId));
 }
 
+// Locates folderId within categoryId's tree and returns its sibling list,
+// its index within that list, and its parent folder id (null if it's a
+// root folder directly under the category) - everything "Move Up"/"Move
+// Down" need to compute a beforeFolderId for moveFolder().
+function findFolderContext(categories, categoryId, folderId) {
+  const category = categories.find((c) => c.id === categoryId);
+  if (!category) return null;
+
+  const search = (siblings, parentFolderId) => {
+    const index = siblings.findIndex((f) => f.id === folderId);
+    if (index !== -1) return { siblings, index, parentFolderId };
+    for (const sibling of siblings) {
+      const found = search(sibling.folders, sibling.id);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  return search(category.folders, null);
+}
+
 function FolderNode({
   folder,
   categoryId,
@@ -208,15 +229,39 @@ function CategoryTree({
   const openContextMenu = (event, folder, categoryId) => {
     event.preventDefault();
     const items = folder
-      ? [
-          { label: 'New Subfolder', onClick: () => onAddFolder(categoryId, folder.id) },
-          { label: 'Rename Folder', onClick: () => onRenameFolder(categoryId, folder.id, folder.name) },
-          {
-            label: 'Delete Folder',
-            danger: true,
-            onClick: () => onDeleteFolder(categoryId, folder.id),
-          },
-        ]
+      ? (() => {
+          const context = findFolderContext(categories, categoryId, folder.id);
+          const moveItems = [];
+          if (context && context.index > 0) {
+            moveItems.push({
+              label: 'Move Up',
+              onClick: () =>
+                onMoveFolder(folder.id, categoryId, context.parentFolderId, context.siblings[context.index - 1].id),
+            });
+          }
+          if (context && context.index < context.siblings.length - 1) {
+            moveItems.push({
+              label: 'Move Down',
+              onClick: () =>
+                onMoveFolder(
+                  folder.id,
+                  categoryId,
+                  context.parentFolderId,
+                  context.siblings[context.index + 2] ? context.siblings[context.index + 2].id : null,
+                ),
+            });
+          }
+          return [
+            { label: 'New Subfolder', onClick: () => onAddFolder(categoryId, folder.id) },
+            { label: 'Rename Folder', onClick: () => onRenameFolder(categoryId, folder.id, folder.name) },
+            ...moveItems,
+            {
+              label: 'Delete Folder',
+              danger: true,
+              onClick: () => onDeleteFolder(categoryId, folder.id),
+            },
+          ];
+        })()
       : [
           { label: 'New Folder', onClick: () => onAddFolder(categoryId, null) },
           {

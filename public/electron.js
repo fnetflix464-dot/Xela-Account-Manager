@@ -215,8 +215,10 @@ handle('rename-folder', (categoryId, folderId, name) =>
 handle('delete-folder', (categoryId, folderId) =>
   withUndo('Delete folder', () => vaultService.deleteFolder(categoryId, folderId)),
 );
-handle('move-folder', (folderId, targetCategoryId, targetParentFolderId) =>
-  withUndo('Move folder', () => vaultService.moveFolder(folderId, targetCategoryId, targetParentFolderId)),
+handle('move-folder', (folderId, targetCategoryId, targetParentFolderId, beforeFolderId) =>
+  withUndo('Move folder', () =>
+    vaultService.moveFolder(folderId, targetCategoryId, targetParentFolderId, beforeFolderId),
+  ),
 );
 
 // ==================== ENTRIES ====================

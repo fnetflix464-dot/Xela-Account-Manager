@@ -38,8 +38,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('add-folder', categoryId, parentFolderId, name),
   renameFolder: (categoryId, folderId, name) => ipcRenderer.invoke('rename-folder', categoryId, folderId, name),
   deleteFolder: (categoryId, folderId) => ipcRenderer.invoke('delete-folder', categoryId, folderId),
-  moveFolder: (folderId, targetCategoryId, targetParentFolderId) =>
-    ipcRenderer.invoke('move-folder', folderId, targetCategoryId, targetParentFolderId),
+  moveFolder: (folderId, targetCategoryId, targetParentFolderId, beforeFolderId) =>
+    ipcRenderer.invoke('move-folder', folderId, targetCategoryId, targetParentFolderId, beforeFolderId),
 
   // ---- entries ----
   addEntry: (categoryId, folderId, entryData) => ipcRenderer.invoke('add-entry', categoryId, folderId, entryData),

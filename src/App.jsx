@@ -332,8 +332,8 @@ function App() {
     } else setError(result.error);
   };
 
-  const handleMoveFolder = async (folderId, targetCategoryId, targetParentFolderId) => {
-    const result = await window.electron.moveFolder(folderId, targetCategoryId, targetParentFolderId);
+  const handleMoveFolder = async (folderId, targetCategoryId, targetParentFolderId, beforeFolderId) => {
+    const result = await window.electron.moveFolder(folderId, targetCategoryId, targetParentFolderId, beforeFolderId);
     if (result.success) loadTree();
     else setError(result.error);
   };
