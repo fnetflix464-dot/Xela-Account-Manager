@@ -183,14 +183,6 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
                   <span className="field-label-text">{field.label}</span>
                   <span className="field-type-badge">{field.type}</span>
                 </div>
-                <button
-                  type="button"
-                  className="btn-remove-field"
-                  onClick={() => removeField(field.id)}
-                  title="Remove field"
-                >
-                  <span className="x-icon" aria-hidden="true" />
-                </button>
                 <label className="hidden-checkbox">
                   <input
                     type="checkbox"
@@ -199,6 +191,14 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
                   />
                   Hidden
                 </label>
+                <button
+                  type="button"
+                  className="btn-remove-field"
+                  onClick={() => removeField(field.id)}
+                  title="Remove field"
+                >
+                  <span className="x-icon" aria-hidden="true" />
+                </button>
               </div>
 
               {field.type === 'note' ? (

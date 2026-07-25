@@ -188,6 +188,9 @@
   width: 1.75rem;
   height: 1.75rem;
   flex-shrink: 0;
+  /* Hard, explicit separation from whatever sits before it (the Hidden
+     checkbox) - not relying on the row's flex `gap` alone anymore. */
+  margin-left: 1.5rem;
 }
 
 .btn-remove-field:hover {
