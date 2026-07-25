@@ -159,7 +159,14 @@
   flex-shrink: 0;
 }
 
-.hidden-checkbox {
+/* Scoped under .field-row-header (not just .hidden-checkbox alone) so
+   this reliably beats .form-group label's "display: block" - that rule
+   and a bare .hidden-checkbox both have exactly one class, but
+   ".form-group label" also has an element selector, which wins the
+   specificity tiebreak. That's the actual reason gap/flex layout here
+   was silently never applying, no matter how much margin/gap was added -
+   this element was never a flex container in the first place. */
+.field-row-header .hidden-checkbox {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -188,9 +195,6 @@
   width: 1.75rem;
   height: 1.75rem;
   flex-shrink: 0;
-  /* Hard, explicit separation from whatever sits before it (the Hidden
-     checkbox) - not relying on the row's flex `gap` alone anymore. */
-  margin-left: 1.5rem;
 }
 
 .btn-remove-field:hover {
