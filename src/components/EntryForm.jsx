@@ -177,60 +177,63 @@ function EntryForm({ entry, passwordGeneratorSettings, onSubmit, onCancel }) {
         {fields.map((field) => {
           const strength = field.type === 'password' ? calculatePasswordStrength(field.value) : '';
           return (
-            <div className="form-group field-row" key={field.id}>
-              <div className="field-row-header">
-                <div className="field-label-display">
-                  <span className="field-label-text">{field.label}</span>
-                  <span className="field-type-badge">{field.type}</span>
-                </div>
-                <label className="hidden-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={field.hidden}
-                    onChange={(e) => updateField(field.id, { hidden: e.target.checked })}
-                  />
-                  Hidden
-                </label>
-                <button
-                  type="button"
-                  className="btn-remove-field"
-                  onClick={() => removeField(field.id)}
-                  title="Remove field"
-                >
-                  <span className="x-icon" aria-hidden="true" />
-                </button>
-              </div>
+            <div className="field-row-wrapper" key={field.id}>
+              <button
+                type="button"
+                className="btn-remove-field"
+                onClick={() => removeField(field.id)}
+                title="Remove field"
+              >
+                <span className="x-icon" aria-hidden="true" />
+              </button>
 
-              {field.type === 'note' ? (
-                <textarea
-                  value={field.value}
-                  onChange={(e) => updateField(field.id, { value: e.target.value })}
-                  rows="3"
-                />
-              ) : (
-                <div className="password-input-group">
-                  <input
-                    type={field.hidden ? 'password' : field.type === 'date' ? 'date' : 'text'}
+              <div className="form-group field-row">
+                <div className="field-row-header">
+                  <div className="field-label-display">
+                    <span className="field-label-text">{field.label}</span>
+                    <span className="field-type-badge">{field.type}</span>
+                  </div>
+                  <label className="hidden-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={field.hidden}
+                      onChange={(e) => updateField(field.id, { hidden: e.target.checked })}
+                    />
+                    Hidden
+                  </label>
+                </div>
+
+                {field.type === 'note' ? (
+                  <textarea
                     value={field.value}
                     onChange={(e) => updateField(field.id, { value: e.target.value })}
+                    rows="3"
                   />
-                  {(field.type === 'password' || field.type === 'pin') && (
-                    <button type="button" className="btn-generate" onClick={() => fillGeneratedPassword(field.id)}>
-                      Generate
-                    </button>
-                  )}
-                </div>
-              )}
+                ) : (
+                  <div className="password-input-group">
+                    <input
+                      type={field.hidden ? 'password' : field.type === 'date' ? 'date' : 'text'}
+                      value={field.value}
+                      onChange={(e) => updateField(field.id, { value: e.target.value })}
+                    />
+                    {(field.type === 'password' || field.type === 'pin') && (
+                      <button type="button" className="btn-generate" onClick={() => fillGeneratedPassword(field.id)}>
+                        Generate
+                      </button>
+                    )}
+                  </div>
+                )}
 
-              {strength && (
-                <div className="strength-indicator">
-                  <span>{strength}</span>
-                </div>
-              )}
+                {strength && (
+                  <div className="strength-indicator">
+                    <span>{strength}</span>
+                  </div>
+                )}
 
-              {(field.type === 'password' || field.type === 'pin') && (
-                <PasswordHistoryList history={field.history} />
-              )}
+                {(field.type === 'password' || field.type === 'pin') && (
+                  <PasswordHistoryList history={field.history} />
+                )}
+              </div>
             </div>
           );
         })}

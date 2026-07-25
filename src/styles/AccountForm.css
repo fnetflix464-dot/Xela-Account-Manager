@@ -118,7 +118,17 @@
 
 /* --- Dynamic field editor additions (EntryForm) --- */
 
+.field-row-wrapper {
+  position: relative;
+}
+
 .field-row {
+  position: relative;
+  /* Stacked above .btn-remove-field on purpose - the button sits behind
+     the card's corner and only its top-right portion peeks out, so the
+     card's own border/background must paint over it, not the other way
+     around. */
+  z-index: 2;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.75rem;
@@ -181,25 +191,34 @@
   margin: 0;
 }
 
+/* Tucked behind the card's top-right corner - overlaps the border on
+   both axes, but since .field-row has a higher z-index, the card's own
+   border/background paints over the button's bottom-left portion,
+   leaving only the top-right poking out ("popping out from behind")
+   while the card's own outline stays fully unbroken. */
 .btn-remove-field {
+  position: absolute;
+  top: -1.40rem;
+  right: 0.75rem;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-card);
   color: #ef4444;
   cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
   width: 1.75rem;
   height: 1.75rem;
   flex-shrink: 0;
 }
 
 .btn-remove-field:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
 }
 
 /* Drawn with two rotated CSS lines instead of the "✕" text glyph - that
