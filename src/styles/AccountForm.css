@@ -128,8 +128,7 @@
 .field-row-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.75rem;
   margin-bottom: 0.6rem;
 }
 
@@ -160,19 +159,14 @@
   flex-shrink: 0;
 }
 
-/* Deliberately its own row below the header, not sharing a line with
-   the remove button - two earlier fixes that kept it on the same flex
-   line as the remove button (margin-left: auto, then a dedicated
-   flex sub-group) both still reportedly overlapped in practice, so this
-   removes the shared-line layout entirely rather than adjusting it again. */
 .hidden-checkbox {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  margin-bottom: 0.6rem;
   font-size: 0.85rem;
   color: var(--color-text-secondary);
-  width: fit-content;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hidden-checkbox input[type='checkbox'] {
@@ -199,6 +193,44 @@
 .btn-remove-field:hover {
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Drawn with two rotated CSS lines instead of the "✕" text glyph - that
+   character's ink extended well outside its own layout box in practice
+   (confirmed via screenshot, not just theorized), spilling over
+   whatever sat to its left regardless of how much gap the box itself
+   had. A CSS-drawn shape can't have that class of problem since there's
+   no font/glyph metrics involved at all. */
+.x-icon,
+.x-icon::before,
+.x-icon::after {
+  box-sizing: border-box;
+}
+
+.x-icon {
+  position: relative;
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+.x-icon::before,
+.x-icon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.x-icon::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.x-icon::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .btn-add-field {
