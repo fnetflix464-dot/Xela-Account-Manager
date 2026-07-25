@@ -312,12 +312,26 @@ handle('delete-backup', (backupPath) => {
 
 handle('rename-backup', (backupPath, newLabel) => vaultService.renameBackup(backupPath, newLabel));
 
+// Windows quirk: after a native save/open dialog closes, the parent
+// BrowserWindow can be left looking focused but not actually receiving
+// keyboard input (renderer text fields stop responding to typing) until
+// the user manually alt-tabs away and back. Explicitly re-focusing the
+// window once the dialog resolves - regardless of whether the user
+// picked a file or canceled - avoids relying on that manual workaround.
+function refocusMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.focus();
+    mainWindow.webContents.focus();
+  }
+}
+
 handle('export-backup', async (backupPath) => {
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Export Backup',
     defaultPath: path.basename(backupPath),
     filters: [{ name: 'Xela Vault Backup', extensions: ['bak'] }],
   });
+  refocusMainWindow();
   if (result.canceled || !result.filePath) return null;
   vaultService.exportBackupTo(backupPath, result.filePath);
   return result.filePath;
@@ -329,6 +343,7 @@ handle('export-vault', async () => {
     defaultPath: 'vault-export.xam',
     filters: [{ name: 'Xela Vault', extensions: ['xam'] }],
   });
+  refocusMainWindow();
   if (result.canceled || !result.filePath) return null;
   vaultService.exportVaultTo(result.filePath);
   return result.filePath;
@@ -340,6 +355,7 @@ handle('import-vault', async (password) => {
     filters: [{ name: 'Xela Vault', extensions: ['xam'] }],
     properties: ['openFile'],
   });
+  refocusMainWindow();
   if (result.canceled || !result.filePaths.length) return null;
   vaultService.importVaultFrom(result.filePaths[0], password);
   return result.filePaths[0];
