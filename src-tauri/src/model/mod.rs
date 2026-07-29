@@ -4,7 +4,7 @@
 // the same objects that get encrypted into vault.xam and exchanged with
 // the renderer over IPC.
 
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
 
 pub mod category;
 pub mod data;

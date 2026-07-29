@@ -1002,7 +1002,8 @@ impl IncomingField {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EntryFieldsUpdate {
     pub title: Option<String>,
     pub template: Option<String>,

@@ -13,6 +13,8 @@
 // the snapshot to restore and the caller (the IPC layer, which already
 // owns the VaultService) applies it via `VaultService::restore_snapshot`.
 
+#![allow(dead_code)]
+
 use crate::model::Vault;
 
 const MAX_HISTORY: usize = 50;
