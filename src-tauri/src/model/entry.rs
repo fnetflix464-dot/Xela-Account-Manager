@@ -44,9 +44,9 @@ pub struct Entry {
     pub favorite: bool,
     pub tags: Vec<String>,
     pub fields: Vec<Field>,
-    #[serde(rename = "createdAt")]
+    #[serde(rename = "createdAt", default)]
     pub created_at: String,
-    #[serde(rename = "updatedAt")]
+    #[serde(rename = "updatedAt", default)]
     pub updated_at: String,
 }
 

@@ -38,9 +38,17 @@ pub struct Field {
     pub hidden: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub history: Vec<PasswordHistoryEntry>,
-    #[serde(rename = "createdAt")]
+    // `default` (not required): the renderer's "add field" flow
+    // (EntryForm.jsx's addField) sends brand-new fields as bare
+    // {id, label, type, value, hidden} with no timestamps, and the JS
+    // backend's updateEntryFields passes that through verbatim into the
+    // persisted vault when there's no matching existing field id - so real
+    // vault.xam files can contain Field objects missing these keys. A
+    // required field here would make such a (currently-valid!) vault
+    // unreadable.
+    #[serde(rename = "createdAt", default)]
     pub created_at: String,
-    #[serde(rename = "updatedAt")]
+    #[serde(rename = "updatedAt", default)]
     pub updated_at: String,
 }
 
@@ -153,6 +161,21 @@ mod tests {
         let mut o = opts("Username", "text");
         o.hidden = Some(true);
         assert!(create_field(o).unwrap().hidden);
+    }
+
+    /// Regression test for a real EntryForm.jsx/VaultService.js interaction:
+    /// the renderer's addField() sends brand-new fields as bare
+    /// {id, label, type, value, hidden} with no timestamps, and JS's
+    /// updateEntryFields persists that object verbatim when it doesn't
+    /// match an existing field id - so real vault.xam files can contain
+    /// Field objects with no createdAt/updatedAt. Must not fail to load.
+    #[test]
+    fn deserializes_a_field_missing_timestamps_like_a_real_freshly_added_one() {
+        let json = r#"{"id":"new-1234-0","label":"Custom","type":"text","value":"hi","hidden":false}"#;
+        let field: Field = serde_json::from_str(json).unwrap();
+        assert_eq!(field.id, "new-1234-0");
+        assert_eq!(field.created_at, "");
+        assert_eq!(field.updated_at, "");
     }
 
     #[test]

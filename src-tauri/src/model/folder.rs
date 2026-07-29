@@ -13,9 +13,9 @@ pub struct Folder {
     pub icon: String,
     pub folders: Vec<Folder>,
     pub entries: Vec<Entry>,
-    #[serde(rename = "createdAt")]
+    #[serde(rename = "createdAt", default)]
     pub created_at: String,
-    #[serde(rename = "updatedAt")]
+    #[serde(rename = "updatedAt", default)]
     pub updated_at: String,
 }
 
