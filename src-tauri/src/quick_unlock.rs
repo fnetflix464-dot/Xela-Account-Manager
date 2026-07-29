@@ -225,30 +225,31 @@ pub fn unlock(
     Ok(Recovered { session_key, salt })
 }
 
+/// In-memory stand-in for the OS keyring, mirroring the JS test suite's
+/// createFakeSafeStorage(): lets tests exercise enable/unlock without
+/// depending on a real Keychain/Secret Service/DPAPI being present (this
+/// sandbox has no secret-service daemon at all). `pub(crate)` so
+/// vault_service.rs's tests can reuse it instead of duplicating.
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod test_support {
+    use super::KeyringBackend;
     use std::cell::RefCell;
     use std::collections::HashMap;
-    use std::fs;
-    use std::process;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
-    /// In-memory stand-in for the OS keyring, mirroring the JS test
-    /// suite's createFakeSafeStorage(): lets tests exercise enable/unlock
-    /// without depending on a real Keychain/Secret Service/DPAPI being
-    /// present (this sandbox has no secret-service daemon at all).
-    struct FakeKeyring {
+    pub(crate) struct FakeKeyring {
         available: bool,
         store: RefCell<HashMap<String, String>>,
     }
 
     impl FakeKeyring {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             Self { available: true, store: RefCell::new(HashMap::new()) }
         }
-        fn unavailable() -> Self {
+        pub(crate) fn unavailable() -> Self {
             Self { available: false, store: RefCell::new(HashMap::new()) }
+        }
+        pub(crate) fn has_secret(&self, key: &str) -> bool {
+            self.store.borrow().contains_key(key)
         }
     }
 
@@ -268,6 +269,15 @@ mod tests {
             Ok(())
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::FakeKeyring;
+    use super::*;
+    use std::fs;
+    use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_quick_unlock_path() -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -347,7 +357,7 @@ mod tests {
         assert!(matches!(result, Err(QuickUnlockError::IncorrectPin)));
         // The secret must still be exactly what enable() wrote - unlock()
         // must reject the PIN before ever touching backend.get_secret.
-        assert!(backend.store.borrow().contains_key(KEYRING_ACCOUNT));
+        assert!(backend.has_secret(KEYRING_ACCOUNT));
     }
 
     #[test]

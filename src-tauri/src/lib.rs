@@ -1,5 +1,6 @@
 mod activity_log;
 mod backup;
+mod command_manager;
 mod crypto;
 mod model;
 mod quick_unlock;
@@ -9,6 +10,7 @@ mod settings_service;
 mod time_util;
 mod vault_file;
 mod vault_repository;
+mod vault_service;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
