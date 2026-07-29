@@ -8,6 +8,7 @@
   "license": "MIT",
   "main": "public/electron.js",
   "dependencies": {
+    "@tauri-apps/api": "^2.9.0",
     "electron-is-dev": "^2.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -15,6 +16,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0",
+    "@tauri-apps/cli": "^2.11.4",
     "concurrently": "^8.0.0",
     "electron": "^31.0.0",
     "electron-builder": "^24.0.0",
@@ -36,7 +38,10 @@
     "test:watch": "react-scripts test",
     "test:e2e": "npm run react-build && playwright test",
     "build": "npm run react-build && electron-builder",
-    "dist": "npm run react-build && electron-builder --publish never"
+    "dist": "npm run react-build && electron-builder --publish never",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "build": {
     "extends": null,
