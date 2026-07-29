@@ -1,5 +1,6 @@
 mod backup;
 mod crypto;
+mod quick_unlock;
 mod vault_file;
 mod vault_repository;
 
