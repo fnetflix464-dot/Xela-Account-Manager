@@ -21,6 +21,7 @@ use tauri_plugin_dialog::DialogExt;
 pub struct AppState {
     pub vault_service: Mutex<VaultService>,
     pub command_manager: Mutex<CommandManager>,
+    pub idle_controller: crate::idle_lock::IdleLockController,
 }
 
 pub fn vault_file_path(app: &AppHandle) -> PathBuf {
@@ -41,9 +42,26 @@ pub fn build_app_state(app: &AppHandle) -> AppState {
         backup_dir: backup_dir_path(app),
         quick_unlock_file_path: Some(quick_unlock_file_path(app)),
     };
+
+    // The idle-lock poll thread's timeout callback re-enters through the
+    // AppHandle rather than capturing AppState directly, since AppState
+    // doesn't exist yet at this point - `.manage(state)` happens right
+    // after this function returns, and by the time the first poll tick
+    // can fire (DEFAULT_POLL_INTERVAL later), it always will.
+    let app_for_idle = app.clone();
+    let idle_controller = crate::idle_lock::IdleLockController::spawn(move || {
+        let state = app_for_idle.state::<AppState>();
+        let mut vs = state.vault_service.lock().unwrap();
+        if vs.is_unlocked() {
+            vs.lock();
+            forward_events(&app_for_idle, &mut vs, &state.command_manager, &state.idle_controller);
+        }
+    });
+
     AppState {
         vault_service: Mutex::new(VaultService::new(config, Box::new(OsKeyring::new()))),
         command_manager: Mutex::new(CommandManager::new()),
+        idle_controller,
     }
 }
 
@@ -61,11 +79,18 @@ fn notify_stack_changed(app: &AppHandle, cm: &CommandManager) {
 }
 
 /// Forwards every VaultEvent recorded since the last drain to the
-/// renderer on the same "vault-event" channel electron.js used, and
-/// clears the undo/redo stack on vault lifecycle transitions - mirroring
+/// renderer on the same "vault-event" channel electron.js used, clears
+/// the undo/redo stack on vault lifecycle transitions (mirroring
 /// CommandManager.js's eventBus listener for CLEARING_ACTIONS, which ran
-/// synchronously off the same event.
-fn forward_events(app: &AppHandle, vault_service: &mut VaultService, command_manager: &Mutex<CommandManager>) {
+/// synchronously off the same event), and drives the idle-lock poll
+/// thread's start/stop - mirroring electron.js's handleIdleLockLifecycle,
+/// which ran off that same event stream.
+fn forward_events(
+    app: &AppHandle,
+    vault_service: &mut VaultService,
+    command_manager: &Mutex<CommandManager>,
+    idle_controller: &crate::idle_lock::IdleLockController,
+) {
     for event in vault_service.drain_events() {
         let payload = json!({ "action": event.action, "details": event.details, "timestamp": event.timestamp });
         let _ = app.emit("vault-event", payload);
@@ -73,6 +98,17 @@ fn forward_events(app: &AppHandle, vault_service: &mut VaultService, command_man
             let mut cm = command_manager.lock().unwrap();
             cm.clear();
             notify_stack_changed(app, &cm);
+        }
+        match event.action.as_str() {
+            "vault.created" | "vault.unlocked" | "settings.updated" => {
+                if vault_service.is_unlocked() {
+                    if let Ok(settings) = vault_service.get_settings() {
+                        idle_controller.start(settings.auto_lock_minutes);
+                    }
+                }
+            }
+            "vault.locked" => idle_controller.stop(),
+            _ => {}
         }
     }
 }
@@ -93,7 +129,7 @@ fn with_undo<T>(
     let before = vs.get_vault().map_err(to_err)?.clone();
     let result = run(&mut vs).map_err(to_err)?;
     let after = vs.get_vault().map_err(to_err)?.clone();
-    forward_events(app, &mut vs, &state.command_manager);
+    forward_events(app, &mut vs, &state.command_manager, &state.idle_controller);
     drop(vs);
 
     let mut cm = state.command_manager.lock().unwrap();
@@ -146,7 +182,7 @@ pub fn check_vault_health(state: State<AppState>) -> HealthyResult {
 pub fn set_master_password(app: AppHandle, state: State<AppState>, password: String) -> Result<bool, String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.create(&password).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(true)
 }
 
@@ -154,7 +190,7 @@ pub fn set_master_password(app: AppHandle, state: State<AppState>, password: Str
 pub fn verify_master_password(app: AppHandle, state: State<AppState>, password: String) -> Result<bool, String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.unlock(&password).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(true)
 }
 
@@ -162,7 +198,7 @@ pub fn verify_master_password(app: AppHandle, state: State<AppState>, password: 
 pub fn lock_vault(app: AppHandle, state: State<AppState>) -> Result<bool, String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.lock();
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(true)
 }
 
@@ -175,7 +211,7 @@ pub fn change_master_password(
 ) -> Result<bool, String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.change_master_password(&current_password, &new_password).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(true)
 }
 
@@ -215,7 +251,7 @@ pub fn disable_quick_unlock(state: State<AppState>) -> Result<bool, String> {
 pub fn unlock_with_pin(app: AppHandle, state: State<AppState>, pin: String) -> Result<bool, String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.unlock_with_pin(&pin).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(true)
 }
 
@@ -369,7 +405,7 @@ pub fn find_reused_passwords(state: State<AppState>) -> Result<Vec<Vec<ReusedPas
 pub fn record_error(app: AppHandle, state: State<AppState>, message: String, stack: String) -> Result<bool, String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.record_error(&message, &stack);
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(true)
 }
 
@@ -391,7 +427,7 @@ pub fn restore_from_recycle_bin(app: AppHandle, state: State<AppState>, recycle_
 pub fn permanently_delete(app: AppHandle, state: State<AppState>, recycle_id: String) -> Result<(), String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.permanently_delete(&recycle_id).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(())
 }
 
@@ -399,7 +435,7 @@ pub fn permanently_delete(app: AppHandle, state: State<AppState>, recycle_id: St
 pub fn empty_recycle_bin(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.empty_recycle_bin().map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(())
 }
 
@@ -454,7 +490,7 @@ pub fn get_settings(state: State<AppState>) -> Result<Settings, String> {
 pub fn update_settings(app: AppHandle, state: State<AppState>, updates: SettingsUpdate) -> Result<Settings, String> {
     let mut vs = state.vault_service.lock().unwrap();
     let result = vs.update_vault_settings(updates).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(result)
 }
 
@@ -469,7 +505,7 @@ pub fn list_backups(state: State<AppState>) -> Vec<PathBuf> {
 pub fn restore_backup(app: AppHandle, state: State<AppState>, backup_path: PathBuf) -> Result<bool, String> {
     let mut vs = state.vault_service.lock().unwrap();
     vs.restore_backup(&backup_path).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(true)
 }
 
@@ -515,7 +551,7 @@ pub fn export_vault(app: AppHandle, state: State<AppState>) -> Result<Option<Pat
     let dest_path = dest.into_path().map_err(to_err)?;
     let mut vs = state.vault_service.lock().unwrap();
     vs.export_vault_to(&dest_path).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(Some(dest_path))
 }
 
@@ -527,7 +563,7 @@ pub fn import_vault(app: AppHandle, state: State<AppState>, password: String) ->
     let source_path = source.into_path().map_err(to_err)?;
     let mut vs = state.vault_service.lock().unwrap();
     vs.import_vault_from(&source_path, &password).map_err(to_err)?;
-    forward_events(&app, &mut vs, &state.command_manager);
+    forward_events(&app, &mut vs, &state.command_manager, &state.idle_controller);
     Ok(Some(source_path))
 }
 

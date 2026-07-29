@@ -3,6 +3,7 @@ mod backup;
 mod command_manager;
 mod commands;
 mod crypto;
+mod idle_lock;
 mod model;
 mod quick_unlock;
 mod recycle_bin;
