@@ -1,6 +1,11 @@
+mod activity_log;
 mod backup;
 mod crypto;
+mod model;
 mod quick_unlock;
+mod recycle_bin;
+mod search;
+mod settings_service;
 mod time_util;
 mod vault_file;
 mod vault_repository;
