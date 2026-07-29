@@ -1,4 +1,7 @@
+mod backup;
 mod crypto;
+mod vault_file;
+mod vault_repository;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
