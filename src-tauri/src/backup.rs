@@ -4,7 +4,6 @@
 
 use crate::vault_file;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const BACKUP_PREFIX: &str = "vault-";
 const BACKUP_SUFFIX: &str = ".xam.bak";
@@ -30,9 +29,7 @@ fn backup_file_name() -> String {
 /// with `-` so it's safe as a filename component (mirrors the JS
 /// `.replace(/[:.]/g, '-')` on the ISO string).
 fn vault_file_now_iso_for_filename() -> String {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
-    let iso = crate::vault_file::iso8601_for(now.as_secs() as i64, now.subsec_millis());
-    iso.replace([':', '.'], "-")
+    crate::time_util::now_iso8601().replace([':', '.'], "-")
 }
 
 /// Creates a timestamped backup copy of the current vault file, then prunes
@@ -131,6 +128,7 @@ mod tests {
     use super::*;
     use std::fs;
     use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_dir(label: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(

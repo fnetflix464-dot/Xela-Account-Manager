@@ -1,6 +1,7 @@
 mod backup;
 mod crypto;
 mod quick_unlock;
+mod time_util;
 mod vault_file;
 mod vault_repository;
 

@@ -30,3 +30,5 @@ rand = "0.8"
 base64 = "0.22"
 thiserror = "2"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "linux-native", "vendored"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
