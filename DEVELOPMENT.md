@@ -25,7 +25,7 @@ npm test            # single run
 npm run test:watch  # watch mode
 ```
 
-Jest via `react-scripts test`, covering the renderer (`src/components`, `src/hooks`, `src/utils`).
+No JS test files exist right now - `npm test` exits clean on zero tests (`--passWithNoTests`). The renderer never had unit tests of its own; the domain-logic tests it used to inherit indirectly moved to `cargo test` along with the code they covered. If you add renderer-only logic worth unit testing, `react-scripts test` (Jest) is still wired up and ready for it.
 
 ```bash
 cd src-tauri && cargo test
@@ -76,7 +76,7 @@ src/
 
 ## Manual smoke test checklist
 
-There's automated coverage for the Rust backend, a handful of renderer units, and one E2E scenario (`npm run test:e2e`, see ROADMAP.md for what it does and doesn't cover) — after a UI change, walk through the rest by hand:
+There's automated coverage for the Rust backend and one E2E scenario (`npm run test:e2e`, see ROADMAP.md for what it does and doesn't cover), but no renderer unit tests — after a UI change, walk through the rest by hand:
 
 1. First launch → set master password → vault unlocks
 2. Lock → unlock with master password
@@ -103,4 +103,4 @@ Install the platform's Tauri prerequisites (see "Prerequisites" above) — the e
 
 ## Retired: the Electron/Node implementation
 
-Xela shipped on Electron through v2.0.0; Tauri has fully replaced it (see ARCHITECTURE.md's "Retired" section and ROADMAP.md for why and the size numbers). `public/electron.js`, `public/preload.cjs`, `src/models/`, `src/services/`, `src/repositories/`, `src/commands/`, `e2e/`, and `playwright.config.js` are unreferenced by any script and pending deletion - don't use them as a reference for how anything currently works.
+Xela shipped on Electron through v2.0.0; Tauri has fully replaced it (see ARCHITECTURE.md's "Retired" section and ROADMAP.md for why and the size numbers). `public/electron.js`, `public/preload.cjs`, the old `src/models/`/`src/services/`/`src/repositories/`/`src/commands/`, and the Electron-only `e2e/`/`playwright.config.js` are gone from the repo - if you're looking for how any of that used to work, check git history (tags/commits before the 3.0.0 cutover) rather than expecting to find it on disk.
