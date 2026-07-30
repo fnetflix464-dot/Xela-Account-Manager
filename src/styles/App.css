@@ -49,6 +49,13 @@
   gap: 0.5rem;
 }
 
+.header-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border);
+  margin: 0 0.15rem;
+}
+
 .btn-icon {
   width: 30px;
   height: 30px;

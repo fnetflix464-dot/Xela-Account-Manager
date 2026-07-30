@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import '../styles/Login.css';
 import { calculatePasswordStrength } from '../utils/passwordStrength';
+import WindowControls from './WindowControls';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { LogicalSize } from '@tauri-apps/api/dpi';
+
+const appWindow = getCurrentWindow();
+const LOGIN_WINDOW_WIDTH = 420;
 
 function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
@@ -17,6 +23,39 @@ function Login({ onLoginSuccess }) {
   const [quickUnlockEnabled, setQuickUnlockEnabled] = useState(false);
   const [usePin, setUsePin] = useState(false);
   const [pin, setPin] = useState('');
+  const loginBoxRef = useRef(null);
+  const lastFitHeightRef = useRef(null);
+
+  // Keeps the (decorations:false) window sized to whatever login panel is
+  // actually showing - scrollHeight reflects the box's true content height
+  // even while it's being clipped by .login-box's max-height/overflow-y,
+  // so this converges instead of fighting the CSS clamp. The window starts
+  // hidden (tauri.conf.json "visible": false) specifically so the very
+  // first paint the user ever sees is already correctly sized - show()
+  // is a no-op once the window is already visible, so calling it on every
+  // fit is harmless and avoids needing separate "first reveal" state.
+  useLayoutEffect(() => {
+    const el = loginBoxRef.current;
+    if (!el) return undefined;
+
+    const fitWindowToContent = () => {
+      const height = Math.round(el.scrollHeight);
+      if (lastFitHeightRef.current === height) {
+        appWindow.show();
+        return;
+      }
+      lastFitHeightRef.current = height;
+      appWindow
+        .setSize(new LogicalSize(LOGIN_WINDOW_WIDTH, height))
+        .then(() => appWindow.center())
+        .then(() => appWindow.show());
+    };
+
+    fitWindowToContent();
+    const observer = new ResizeObserver(fitWindowToContent);
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
 
   useEffect(() => {
     checkVaultStatus();
@@ -235,8 +274,11 @@ function Login({ onLoginSuccess }) {
     return (
       <div className="login-container">
         <div className="login-box">
-          <div className="spinner"></div>
-          <p>Loading...</p>
+          <WindowControls />
+          <div data-tauri-drag-region="deep">
+            <div className="spinner"></div>
+            <p>Loading...</p>
+          </div>
         </div>
       </div>
     );
@@ -245,8 +287,9 @@ function Login({ onLoginSuccess }) {
   if (mode === 'recovery') {
     return (
       <div className="login-container">
-        <div className="login-box">
-          <div className="login-header">
+        <div className="login-box" ref={loginBoxRef}>
+          <WindowControls />
+          <div className="login-header" data-tauri-drag-region="deep">
             <h1 className="app-wordmark login-wordmark">
               <span className="app-wordmark-main">XELA</span>
               <span className="app-wordmark-sub">Account Manager</span>
@@ -304,8 +347,9 @@ function Login({ onLoginSuccess }) {
   if (mode === 'verify' && usePin) {
     return (
       <div className="login-container">
-        <div className="login-box">
-          <div className="login-header">
+        <div className="login-box" ref={loginBoxRef}>
+          <WindowControls />
+          <div className="login-header" data-tauri-drag-region="deep">
             <h1 className="app-wordmark login-wordmark">
               <span className="app-wordmark-main">XELA</span>
               <span className="app-wordmark-sub">Account Manager</span>
@@ -359,8 +403,9 @@ function Login({ onLoginSuccess }) {
   if (mode === 'import') {
     return (
       <div className="login-container">
-        <div className="login-box">
-          <div className="login-header">
+        <div className="login-box" ref={loginBoxRef}>
+          <WindowControls />
+          <div className="login-header" data-tauri-drag-region="deep">
             <h1 className="app-wordmark login-wordmark">
               <span className="app-wordmark-main">XELA</span>
               <span className="app-wordmark-sub">Account Manager</span>
@@ -416,8 +461,9 @@ function Login({ onLoginSuccess }) {
 
   return (
     <div className="login-container">
-      <div className="login-box">
-        <div className="login-header">
+      <div className="login-box" ref={loginBoxRef}>
+        <WindowControls />
+        <div className="login-header" data-tauri-drag-region="deep">
           <h1 className="app-wordmark login-wordmark">
             <span className="app-wordmark-main">XELA</span>
             <span className="app-wordmark-sub">Account Manager</span>

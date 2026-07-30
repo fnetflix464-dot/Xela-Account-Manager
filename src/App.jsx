@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './styles/App.css';
+import WindowControls from './components/WindowControls';
 import Login from './components/Login';
 import CategoryTree from './components/CategoryTree';
 import EntryList from './components/EntryList';
@@ -155,10 +156,16 @@ function App() {
     return undefined;
   }, [settings]);
 
-  // The main window starts sized for the small Login card; grow it to
-  // the full app size once authenticated, and shrink back on lock.
+  // Grow the window to the full app size once authenticated. Shrinking
+  // back on lock is intentionally NOT done here - Login.jsx's own
+  // ResizeObserver-driven per-panel fit owns sizing while unauthenticated
+  // (both on first mount and after Lock), and racing it against this
+  // coarse Rust-side preset caused the window to snap back to the wrong
+  // size depending on which async resize call happened to resolve last.
   useEffect(() => {
-    window.api.setWindowMode(isAuthenticated ? 'app' : 'login');
+    if (isAuthenticated) {
+      window.api.setWindowMode('app');
+    }
   }, [isAuthenticated]);
 
   const loadTree = useCallback(async () => {
@@ -452,7 +459,7 @@ function App() {
       }
     >
       <header className="app-header">
-        <div className="app-header-top">
+        <div className="app-header-top" data-tauri-drag-region="deep">
           <h1 className="app-wordmark">
             <span className="app-wordmark-main">XELA</span>
             <span className="app-wordmark-sub">Account Manager</span>
@@ -471,6 +478,8 @@ function App() {
             <button className="btn-lock" onClick={handleLock}>
               Lock
             </button>
+            <span className="header-divider" />
+            <WindowControls />
           </div>
         </div>
         <nav className="nav-tabs">

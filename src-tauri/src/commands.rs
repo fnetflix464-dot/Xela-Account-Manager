@@ -140,7 +140,7 @@ fn with_undo<T>(
 
 // ==================== WINDOW ====================
 
-const LOGIN_WINDOW: (f64, f64, f64, f64) = (520.0, 700.0, 460.0, 600.0); // width, height, minWidth, minHeight
+const LOGIN_WINDOW: (f64, f64, f64, f64) = (420.0, 180.0, 380.0, 150.0); // width, height, minWidth, minHeight - matches Login.jsx's initial "loading" panel; every other panel is fit dynamically by Login.jsx's ResizeObserver once mounted
 const APP_WINDOW: (f64, f64, f64, f64) = (1280.0, 840.0, 900.0, 600.0);
 
 #[tauri::command]

@@ -2,20 +2,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
     'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
 .login-box {
+  position: relative;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  max-height: 100%;
   padding: 40px;
   background: var(--color-bg-surface);
-  border-radius: 12px;
-  box-shadow: var(--shadow-modal);
+  overflow-y: auto;
   animation: slideUp 0.5s ease-out;
+}
+
+.login-box .window-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
 }
 
 @keyframes slideUp {

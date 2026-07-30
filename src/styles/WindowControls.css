@@ -1,0 +1,99 @@
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.window-control-btn {
+  width: 26px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.window-control-btn:hover {
+  background: var(--color-bg-surface-alt);
+  color: var(--color-text-primary);
+}
+
+.window-control-btn-close:hover {
+  background: #ef4444;
+  color: white;
+}
+
+.window-control-icon {
+  position: relative;
+  width: 9px;
+  height: 9px;
+}
+
+.window-control-icon-min::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+}
+
+.window-control-icon-max {
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  margin: 0.5px auto;
+}
+
+.window-control-icon-restore {
+  box-sizing: border-box;
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  margin: 3px 0 0 3px;
+}
+
+.window-control-icon-restore::before {
+  content: '';
+  position: absolute;
+  box-sizing: border-box;
+  top: -3px;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  background: var(--color-bg-surface);
+}
+
+.window-control-btn:hover .window-control-icon-restore::before {
+  background: var(--color-bg-surface-alt);
+}
+
+.window-control-btn-close:hover .window-control-icon-restore::before {
+  background: #ef4444;
+}
+
+.window-control-icon-close::before,
+.window-control-icon-close::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+}
+
+.window-control-icon-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.window-control-icon-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
