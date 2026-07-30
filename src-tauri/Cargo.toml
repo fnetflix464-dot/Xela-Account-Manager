@@ -1,6 +1,6 @@
 [package]
 name = "xela-account-manager"
-version = "2.0.0"
+version = "3.0.0"
 description = "Offline, encrypted local vault for accounts, notes, cards, keys and more"
 authors = ["fnetflix464-dot"]
 license = "MIT"

@@ -1,11 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Xela Account Manager",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "identifier": "com.xela.accountmanager",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run react-start",
     "beforeBuildCommand": "npm run react-build"
   },
   "app": {
