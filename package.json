@@ -13,7 +13,8 @@
     "react-scripts": "5.0.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4"
+    "@tauri-apps/cli": "^2.11.4",
+    "webdriverio": "^9.30.0"
   },
   "eslintConfig": {
     "extends": [
@@ -27,6 +28,7 @@
     "start": "tauri dev",
     "test": "react-scripts test --watchAll=false",
     "test:watch": "react-scripts test",
+    "test:e2e": "tauri build --no-bundle && node e2e-tauri/run.mjs",
     "build": "tauri build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
