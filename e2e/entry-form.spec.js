@@ -1,4 +1,8 @@
 // @ts-check
+// STALE - launches public/electron.js, which is retired now that Tauri is
+// the only runtime (see ROADMAP.md). Not reachable from any npm script.
+// Delete this file (and e2e/, playwright.config.js) once Tauri has its own
+// E2E setup to port this test's coverage to.
 const os = require('os');
 const path = require('path');
 const fs = require('fs');

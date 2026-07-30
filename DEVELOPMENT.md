@@ -1,8 +1,10 @@
 # Development
 
 ## Prerequisites
-- Node.js 18+
-- npm
+- Node.js 18+ and npm
+- Rust toolchain (`rustup`) and the platform's Tauri prerequisites:
+  - **Linux**: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `libxss-dev` (idle-detection needs the X11 screensaver extension headers), `patchelf`
+  - **Windows/macOS**: see https://tauri.app/start/prerequisites/
 
 ## Setup
 ```bash
@@ -14,13 +16,7 @@ npm install
 npm start
 ```
 
-Runs the CRA dev server (`http://localhost:3000`) and Electron together via `concurrently`; Electron waits for the dev server to be ready before launching, and opens with DevTools attached.
-
-### Tauri (parallel runtime, in progress - see ROADMAP.md)
-```bash
-npm run tauri:dev
-```
-Requires the Rust toolchain (`rustup`) plus the platform's Tauri prerequisites - on Linux: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `libxss-dev` (idle-detection needs the X11 screensaver extension headers), `patchelf`. See https://tauri.app/start/prerequisites/ for Windows/macOS.
+Runs `tauri dev`, which starts the CRA dev server (`http://localhost:3000`) itself via `beforeDevCommand` and launches the native window once it's ready - one command, no manual concurrent-process wrangling.
 
 ## Testing
 ```bash
@@ -28,58 +24,52 @@ npm test            # single run
 npm run test:watch  # watch mode
 ```
 
-Jest via `react-scripts test`. Covers `CryptoService`, `FileService`, `VaultRepository`, `VaultService`, `QuickUnlockService`, `CommandManager`, and `EventBus`.
+Jest via `react-scripts test`, covering the renderer (`src/components`, `src/hooks`, `src/utils`).
+
+```bash
+cd src-tauri && cargo test
+```
+
+The Rust backend's own suite - crypto, vault repository/service, command manager, quick-unlock, idle-lock, activity log, recycle bin, search, settings, backups.
 
 ## Building
 ```bash
-npm run build   # react-scripts build + electron-builder (publishes if a draft release exists)
-npm run dist    # same, but --publish never
-npm run tauri:build   # react-scripts build + Tauri bundling (.deb/.rpm/AppImage on Linux)
+npm run build   # react-scripts build + Tauri bundling (.deb/.rpm/AppImage on Linux, .msi/.exe on Windows, .dmg/.app on macOS)
 ```
 
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full picture (process split, module system, layering, vault file format, PIN quick-unlock security model, undo/redo, theming). Summary:
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full picture (process split, layering, vault file format, PIN quick-unlock security model, idle auto-lock, undo/redo, theming). Summary:
 
-- **Renderer** (`src/`, React) — never touches Node/Electron APIs directly
-- **Main process** (`public/electron.js`, CommonJS) — window management, IPC handlers, disk/crypto access
-- **Bridge** (`public/preload.cjs`) — the only thing exposed to the renderer, as `window.electron`
+- **Renderer** (`src/`, React) — never touches the filesystem or Rust directly
+- **Backend** (`src-tauri/`, Rust) — window management, commands (the IPC surface), disk/crypto access
+- **Bridge** (`src/tauriBridge.js`) — the only thing exposed to the renderer, as `window.api`
 
 ## File structure
 
 ```
+src-tauri/
+├── src/
+│   ├── commands.rs            # Tauri command layer - the IPC surface the renderer calls into
+│   ├── vault_repository.rs, vault_service.rs, command_manager.rs, quick_unlock.rs,
+│   │   idle_lock.rs, recycle_bin.rs, search.rs, settings_service.rs, activity_log.rs, backup.rs
+│   └── model/                 # Category/Folder/Entry/Field/Settings/Vault structs
+└── tauri.conf.json
+
 src/
 ├── App.jsx                # Renderer root
+├── tauriBridge.js          # window.api - the sole bridge into src-tauri/
 ├── index.js                # React entry point
 ├── index.css                 # Global styles + shared button/panel primitives
 ├── components/               # React components
 ├── hooks/                    # React hooks
 ├── utils/                    # Renderer-only helpers (theming, clipboard, password tools)
-├── models/                   # Plain data + validation (ESM)
-├── services/                 # CryptoService, FileService, VaultService, ... (ESM)
-├── repositories/             # VaultRepository - the only layer touching disk/crypto (ESM)
-├── commands/                 # Undo/redo command objects (ESM)
-└── data/                     # entryTemplates.js, fieldTypes.js (ESM)
-
-public/
-├── electron.js             # Main process (CommonJS)
-├── preload.cjs              # contextBridge (CommonJS)
-└── index.html                # HTML template
-
-src-tauri/                  # Parallel Rust backend (see ARCHITECTURE.md) - not yet the default build
-├── src/
-│   ├── commands.rs            # Tauri command layer, the Rust equivalent of electron.js's IPC handlers
-│   ├── vault_repository.rs, vault_service.rs, command_manager.rs, quick_unlock.rs,
-│   │   recycle_bin.rs, search.rs, settings_service.rs, activity_log.rs, backup.rs
-│   └── model/                 # Category/Folder/Entry/Field/Settings/Vault structs
-└── tauri.conf.json
-
-src/tauriBridge.js          # window.electron shim for the Tauri runtime (mirrors preload.cjs)
+└── data/                     # entryTemplates.js, fieldTypes.js - shared UI metadata
 ```
 
 ## Manual smoke test checklist
 
-There's automated coverage for the service/repository layers, but no end-to-end UI test suite yet — after a UI change, walk through:
+There's automated coverage for the Rust backend and a handful of renderer units, but no end-to-end UI test suite currently wired up (see ROADMAP.md) — after a UI change, walk through:
 
 1. First launch → set master password → vault unlocks
 2. Lock → unlock with master password
@@ -98,14 +88,12 @@ lsof -i :3000
 kill -9 <PID>
 ```
 
-### Electron not starting / dependency issues
-```bash
-rm -rf node_modules package-lock.json
-npm install
-```
+### `npm start`/`npm run build` fails with a `pkg-config`/missing system library error
+Install the platform's Tauri prerequisites (see "Prerequisites" above) — the error names the missing `.pc` package (e.g. `gdk-3.0`, `xscrnsaver`); on Debian/Ubuntu that maps to an apt `-dev` package of the same base name.
 
-### Packaged app crashes but dev mode works
-Usually an ESM/CJS resolution mismatch that only surfaces under Electron's bundled Node, not your local Node version or Jest's Babel-transpiled test execution — check that every directory under `src/` that's imported from `public/electron.js` has the right nested `package.json` (`{"type":"module"}`), and launch the actual packaged `.exe`/binary to reproduce, not just `npm start`.
+### Packaged app behaves differently than `npm start`
+`npm run build`'s bundle runs against the production React build (`build/`), not the dev server - if something only reproduces there, rule out dev-only behavior (e.g. React StrictMode's double-invoke) before assuming it's a packaging bug.
 
-### `cargo build`/`tauri:dev` fails with a `pkg-config`/missing system library error
-Install the platform's Tauri prerequisites (see "Tauri" above) — the error names the missing `.pc` package (e.g. `gdk-3.0`, `xscrnsaver`); on Debian/Ubuntu that maps to an apt `-dev` package of the same base name.
+## Retired: the Electron/Node implementation
+
+Xela shipped on Electron through v2.0.0; Tauri has fully replaced it (see ARCHITECTURE.md's "Retired" section and ROADMAP.md for why and the size numbers). `public/electron.js`, `public/preload.cjs`, `src/models/`, `src/services/`, `src/repositories/`, `src/commands/`, `e2e/`, and `playwright.config.js` are unreferenced by any script and pending deletion - don't use them as a reference for how anything currently works.

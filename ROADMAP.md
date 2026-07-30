@@ -17,16 +17,34 @@
 - [x] Theming: light/dark/system, accent/background/panel colors, background image
 - [x] Minimalist visual redesign
 - [x] Packaging (electron-builder)
+- [x] Migrate the runtime from Electron to Tauri v2 for shipped app size (see below)
 
-## Tauri v2 (in progress, parallel to Electron)
+## Tauri v2 migration (shipped, cleanup pending)
 
-A full Rust backend lives in `src-tauri/`, built alongside the existing Electron app rather than replacing it yet - `npm start`/`npm run build` still target Electron; `npm run tauri:dev`/`npm run tauri:build` target Tauri. See ARCHITECTURE.md.
+Electron is retired. `npm start`/`npm run build` now target Tauri (`src-tauri/`, Rust) exclusively - see ARCHITECTURE.md for the "Retired" section covering what changed.
 
-- [x] Rust port of the full data/domain layer and command surface (crypto, vault repository/service, command manager, quick-unlock, idle-lock, activity log, recycle bin, search, settings, backups) - 120 Rust unit tests, verified byte-compatible with vault files written by the Electron/Node build
-- [x] Frontend bridge (`src/tauriBridge.js`) reshapes `invoke()` into the same `{success,data}` envelope `window.electron` always returned, so no `src/` component or hook needs to change
-- [x] Packaging verified end-to-end: `npm run tauri:build` produces working `.deb`/`.rpm`/AppImage bundles; the built binary launches and renders under a headless X server without errors
-- [ ] Cutover decision: which runtime ships by default, whether Electron is dropped, Windows/macOS icon and installer parity
-- [ ] E2E coverage: `e2e/` is Electron-only (Playwright's `_electron`), no Tauri equivalent yet (would need `tauri-driver`/WebDriver)
+**Why**: shipped size. Measured on this repo, same version, same platform (Linux x64):
+
+| | Electron | Tauri | |
+|---|---|---|---|
+| Unpacked app | 402 MB | 13 MB | ~31x smaller |
+| AppImage | 133 MB | 75 MB | ~1.8x smaller |
+| .deb / .rpm | *(n/a - Electron only shipped AppImage/snap)* | 4 MB | — |
+
+The `.deb`/`.rpm` gap is the starkest number: Tauri links against the system's already-installed WebView instead of bundling an entire Chromium+Node runtime inside the package, the way Electron's AppImage/snap/unpacked builds all do.
+
+Done:
+- [x] Rust port of the full data/domain layer and command surface (crypto, vault repository/service, command manager, quick-unlock, idle-lock, activity log, recycle bin, search, settings, backups) - 120 Rust unit tests, verified byte-compatible with vault files written by the old Electron/Node build
+- [x] Frontend bridge (`src/tauriBridge.js`) installs `window.api`, reshaping `invoke()` into the `{success,data}` envelope every component already expects
+- [x] `npm start`/`npm run build` repointed at Tauri; Electron/electron-builder/electron-is-dev dependencies and the electron-builder `package.json` config block removed
+- [x] Packaging verified end-to-end: `npm run build` produces working `.deb`/`.rpm`/AppImage bundles; the built binary launches and renders under a headless X server without errors
+
+Not yet done:
+- [ ] **Physical deletion of the retired files** - a sandbox restriction blocked the session that did this migration from running `rm`/`git rm`. Still present on disk but unreferenced by any script:
+  `public/electron.js`, `public/preload.cjs`, `src/models/`, `src/services/`, `src/repositories/`, `src/commands/`, `e2e/`, `playwright.config.js`.
+  To finish: `git rm -r public/electron.js public/preload.cjs src/models src/services src/repositories src/commands e2e playwright.config.js && git commit`. (`src/data/` is *not* on this list - the renderer imports it directly for entry-template/field-type metadata.)
+- [ ] Windows/macOS icon and installer parity (only verified on Linux so far - no Windows/macOS runner available in this environment)
+- [ ] E2E coverage: the old `e2e/` suite drove Electron directly via Playwright's `_electron`, which has no Tauri equivalent; a replacement would need `tauri-driver`/WebDriver
 
 ## Not yet done
 

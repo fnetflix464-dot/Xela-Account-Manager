@@ -2,62 +2,55 @@
 
 ## Process split
 
-Electron's two-process model applies as usual: the **main process** (`public/electron.js`) owns the window, all disk/crypto access, and every IPC handler; the **renderer** (`src/`, React) never touches Node/Electron APIs directly. `public/preload.cjs` is the only bridge between them, exposed as `window.electron` via `contextBridge`. Every IPC channel is wrapped by the same `handle(channel, fn)` helper in `electron.js`, which try/catches and always resolves `{ success, data }` or `{ success: false, error }` — the renderer never has to special-case IPC failures.
-
-## Module system
-
-`src/models/`, `src/services/`, `src/repositories/`, `src/commands/`, and `src/data/` are genuine ES Modules (each has its own nested `package.json` with `{"type":"module"}`, scoped to just that directory). `public/electron.js` and `public/preload.cjs` stay CommonJS — two hard constraints forced this split:
-
-- A root-level `"type":"module"` breaks CRA's webpack build (it starts requiring explicit file extensions on every renderer import).
-- Electron 31's `require('electron')` doesn't resolve to the real API object when the main script itself is loaded as an ES Module — it silently falls back to a stub. `electron.js` reaches the ESM services via dynamic `await import(...)` inside its `async` `app.on('ready', ...)` handler instead, the standard CJS-consumes-ESM interop path.
+`src-tauri/` (Rust) owns the window, all disk/crypto access, and every command - the IPC surface the renderer calls into; the **renderer** (`src/`, React) never touches the filesystem or Rust directly. `src/tauriBridge.js` is the only bridge between them, installing `window.api`. Every command's result is wrapped the same way: `{ success, data }` or `{ success: false, error }` - the renderer never has to special-case a failure.
 
 ## Layers
 
 ```
-VaultRepository  →  the only place that touches disk or crypto directly
+vault_repository.rs  →  the only place that touches disk or crypto directly
        ↑
-  VaultService    →  domain logic over an in-memory vault tree; decides *when*
-       ↑              to persist, the repository decides *how*
-   electron.js     →  IPC handlers, one per channel, thin wrappers around
-       ↑              VaultService calls (some wrapped in withUndo())
-    preload.cjs      →  contextBridge surface, window.electron
+  vault_service.rs    →  domain logic over an in-memory vault tree; decides *when*
+       ↑                  to persist, the repository decides *how*
+   commands.rs          →  Tauri command handlers, one per command, thin wrappers
+       ↑                   around VaultService calls (some wrapped in with_undo())
+  tauriBridge.js          →  window.api surface
        ↑
     React renderer
 ```
 
-`VaultService` holds all runtime state for a session — the derived AES key and the decrypted vault object live only in memory, never written to disk in plaintext, and are zeroed (not just dereferenced) on lock. It composes several single-purpose services rather than doing everything itself: `ActivityLogService`, `RecycleBinService`, `SettingsService`, `SearchService`, `QuickUnlockService`, `BackupService` (via the repository). Activity-log and recycle-bin entries are written into the same in-memory vault object *before* `persist()` runs — deliberately not event-driven, since they need to land in the same atomic write as the mutation that caused them, not a separate one.
+`VaultService` (`vault_service.rs`) holds all runtime state for a session — the derived AES key and the decrypted vault object live only in memory, never written to disk in plaintext, and are zeroed (not just dropped) on lock. It composes several single-purpose modules rather than doing everything itself: `activity_log.rs`, `recycle_bin.rs`, `settings_service.rs`, `search.rs`, `quick_unlock.rs`, `backup.rs` (via the repository). Activity-log and recycle-bin entries are written into the same in-memory vault object *before* `persist()` runs — deliberately not event-driven, since they need to land in the same atomic write as the mutation that caused them, not a separate one.
 
-`EventBus` (`src/services/EventBus.js`, a thin `EventEmitter` wrapper) is reserved for the opposite case: decoupled, order-insensitive notifications emitted *after* a successful persist (`entry.deleted`, `vault.locked`, `command.stackChanged`, ...). `electron.js` forwards every event to the renderer over one generalized `vault-event` channel; `CommandManager` listens for lifecycle events to clear its undo stack.
+Domain events (`entry.deleted`, `vault.locked`, `command.stackChanged`, ...) recorded by `VaultService` are drained and forwarded to the renderer after every mutating command, by `commands.rs`'s `forward_events()` - called explicitly at each command site rather than through a decoupled listener, since Rust's ownership model makes an event-bus-style callback registry more friction than it's worth for what's ultimately a fixed, known set of call sites. `CommandManager` (`command_manager.rs`) clears its own undo stack in response to the same drained events (vault lifecycle transitions invalidate any pending undo/redo).
 
 ## Vault file format
 
 `vault.xam` is a plain JSON envelope on the outside — `{ fileVersion, salt, iv, authTag, ciphertext, savedAt }` — with only `ciphertext` (the actual vault tree) encrypted. This split is what makes two things possible without ever touching the password:
-- **Structural corruption detection**: `FileService.isVaultFileStructurallyValid()` just checks the envelope parses and has the expected fields. A vault file can fail *this* check (definite corruption) or fail decryption (wrong password *or* tampering — AES-GCM can't distinguish the two) — the recovery UI (Login screen) branches on which one happened.
-- **Atomic, durable writes**: `FileService.writeVaultFile()` writes to a temp file, `fsync`s it, then renames over the live file. Renaming is atomic at the filesystem level on both NTFS and POSIX, so a crash mid-write leaves either the complete old file or the complete new one — never a truncated one.
+- **Structural corruption detection**: `vault_file.rs`'s structural-validity check just confirms the envelope parses and has the expected fields. A vault file can fail *this* check (definite corruption) or fail decryption (wrong password *or* tampering — AES-GCM can't distinguish the two) — the recovery UI (Login screen) branches on which one happened.
+- **Atomic, durable writes**: `vault_file.rs`'s write path writes to a temp file, `fsync`s it, then renames over the live file. Renaming is atomic at the filesystem level on both NTFS and POSIX, so a crash mid-write leaves either the complete old file or the complete new one — never a truncated one.
 
-Every save also rotates a timestamped backup (`BackupService`, pruned to the configured `backupCount`).
+Every save also rotates a timestamped backup (`backup.rs`, pruned to the configured `backupCount`).
 
 ## PIN quick-unlock security model
 
-The master password is always the vault's real encryption key. PIN quick-unlock (`src/services/QuickUnlockService.js`) does not change that — it wraps the *already-derived session key* using Electron's `safeStorage` (OS-level DPAPI/Keychain/libsecret), decryptable only by the same OS user account. The PIN itself is checked against a stored PBKDF2 verifier purely as a local UX gate; it adds no cryptographic protection beyond the OS-account boundary, which is the actual security boundary here — a short numeric PIN doesn't have the entropy to be a real key on its own, so the design leans entirely on the OS to protect the wrapped key at rest instead of pretending the PIN does.
+The master password is always the vault's real encryption key. PIN quick-unlock (`quick_unlock.rs`) does not change that — it wraps the *already-derived session key* using the `keyring` crate's OS-level credential store backends (DPAPI/Keychain/libsecret via `OsKeyring`), decryptable only by the same OS user account. The PIN itself is checked against a stored PBKDF2 verifier purely as a local UX gate; it adds no cryptographic protection beyond the OS-account boundary, which is the actual security boundary here — a short numeric PIN doesn't have the entropy to be a real key on its own, so the design leans entirely on the OS to protect the wrapped key at rest instead of pretending the PIN does.
 
-Any operation that changes the vault's real key (master-password change, backup restore, import) proactively disables quick-unlock, since the previously wrapped key would otherwise go silently stale. `VaultRepository.loadWithKey()` also re-checks the vault file's salt against the recovered key as a backstop, in case a future key-changing code path forgets to call the invalidation.
+Any operation that changes the vault's real key (master-password change, backup restore, import) proactively disables quick-unlock, since the previously wrapped key would otherwise go silently stale. `vault_repository.rs`'s `load_with_key()` also re-checks the vault file's salt against the recovered key as a backstop, in case a future key-changing code path forgets to call the invalidation.
+
+## Idle auto-lock
+
+`idle_lock.rs`'s `IdleLockController` polls real OS idle time (via the `user-idle` crate) on a background thread, started/stopped off the same vault-lifecycle events described above rather than reset on every command - there's nothing to reset while nothing is idle-able to begin with. Its timeout callback re-enters through a cloned `AppHandle` rather than capturing `AppState` directly, since the controller is constructed inside `build_app_state()`, before `AppState` itself exists to capture.
 
 ## Undo/redo
 
-`src/commands/` implements snapshot-based undo/redo: `CommandManager.execute()` snapshots the whole in-memory vault object before/after a mutation. `VaultService` already treats `vault` as immutable (`{ ...vault, ... }` everywhere), so retaining bounded snapshot references is cheap — unchanged subtrees are the same object references. `undo()`/`redo()` restore a snapshot directly rather than re-running the original mutation, which would mint new UUIDs and diverge from what was actually undone.
+`command_manager.rs` implements snapshot-based undo/redo: `commands.rs`'s `with_undo()` clones the whole in-memory `Vault` before/after a mutation and pushes both onto a bounded stack (`MAX_HISTORY = 50`). `undo()`/`redo()` restore a snapshot directly rather than re-running the original mutation, which would mint new UUIDs and diverge from what was actually undone.
 
 Deliberately **not** undoable: settings changes (better suited to one deliberate "Save" than Ctrl+Z), master-password/import/restore-backup (they change the vault's encryption identity, not just its content), and permanent delete / empty recycle bin (the UI explicitly promises these "cannot be undone" — silently making them undoable would break that promise).
 
-## Tauri backend (parallel runtime, not yet the default)
+## Retired: the original Electron/Node implementation
 
-`src-tauri/` is a Rust port of everything above the renderer - `electron.js`'s IPC handlers, `VaultRepository`/`VaultService`/`CommandManager`, and the domain services it composes - built to run *alongside* the Electron app, not replace it (see ROADMAP.md for cutover status). It mirrors the JS layering module-for-module (`vault_repository.rs`, `vault_service.rs`, `command_manager.rs`, `quick_unlock.rs`, `recycle_bin.rs`, `search.rs`, `settings_service.rs`, `activity_log.rs`, `backup.rs`), and `src-tauri/tests/fixtures/sample-vault.xam` (generated by the Node app) round-trips through the Rust repository to confirm the two implementations stay byte-compatible on the vault file format.
+Xela shipped on Electron through v2.0.0; `src-tauri/` (Rust) has since fully replaced it, for a fraction of the shipped size - see ROADMAP.md for the concrete before/after numbers. Everything above describes the Rust implementation, which is the only one still in active use.
 
-Two things replace Electron/Node platform APIs that don't exist in Tauri's Rust main process:
-- **PIN quick-unlock**: `safeStorage` (DPAPI/Keychain/libsecret) becomes the `keyring` crate's equivalent OS credential store backends (`quick_unlock.rs`'s `OsKeyring`), wrapping the same already-derived session key under the same security model described above.
-- **Idle auto-lock**: `powerMonitor`'s idle-time polling becomes `idle_lock.rs`'s `IdleLockController`, a background poll thread (via the `user-idle` crate) started/stopped off the same vault-lifecycle events electron.js used, calling back into `AppState` through a cloned `AppHandle` (captured before `AppState` itself exists, since the controller is built inside `build_app_state()`).
-
-`src/tauriBridge.js` is the renderer-side counterpart to `preload.cjs`: it installs `window.electron` with the exact same method names/argument order, re-wrapping Tauri's `invoke()` (which resolves directly to a value or rejects with a string) back into the `{success,data}`/`{success,error}` envelope every existing component already expects - so nothing under `src/components`, `src/hooks`, etc. needs to know which runtime it's talking to. It only installs itself when `window.__TAURI_INTERNALS__` is present and `window.electron` isn't already set, so an Electron build is unaffected. `vault-event` is emitted the same way on both backends (`app.emit("vault-event", payload)` vs. `mainWindow.webContents.send(...)`), including the undo/redo stack's `command.stackChanged` event, which electron.js drove from `CommandManager`'s own `EventBus` listener but `commands.rs` emits directly from `notify_stack_changed()` since there's no equivalent decoupled event bus on the Rust side.
+`public/electron.js`, `public/preload.cjs`, and the JS backend it drove (`src/models/`, `src/services/`, `src/repositories/`, `src/commands/`) are **retired and unreferenced by any npm script** - `src-tauri/tests/fixtures/sample-vault.xam` (generated by that old Node app) is kept only to round-trip through `vault_repository.rs` in a test confirming the two implementations stayed byte-compatible on the vault file format during the port. These files are still physically present in the repo pending deletion (a tooling limitation blocked the session that did this cutover from deleting files - see ROADMAP.md) but should not be treated as a source of truth for anything; do not resurrect the pattern of dynamic `import()` from a CommonJS main process, ESM-scoped nested `package.json` files, etc. described in older revisions of this document - none of it applies anymore.
 
 ## Theming
 

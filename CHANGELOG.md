@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [3.0.0] — Tauri v2 migration
+
+Electron replaced with a Tauri v2 (Rust) backend, for a fraction of the shipped size: the unpacked app goes from 402 MB to 13 MB, and the packaged `.deb`/`.rpm` is 4 MB versus a 133 MB Electron AppImage (see ROADMAP.md for the full comparison). The vault file format, crypto, and every user-facing behavior are unchanged - this is a runtime swap, not a data migration; existing `vault.xam` files open as-is.
+
+### Backend
+- Full Rust port of the domain/data layer and command surface: crypto, vault repository/service, command manager (undo/redo), PIN quick-unlock (via the OS keyring instead of Electron's `safeStorage`), idle auto-lock (via OS idle-time polling instead of `powerMonitor`), activity log, recycle bin, search, settings, backups
+- 120 Rust unit tests, including a round-trip check against a vault file written by the retired Electron/Node implementation to confirm byte-compatibility
+- `src/tauriBridge.js` installs `window.api`, replacing `window.electron`; every command result keeps the same `{success,data}`/`{success,error}` envelope so renderer code didn't need to change shape, just the one property name it reads off `window`
+
+### Removed
+- Electron, `electron-builder`, `electron-is-dev` and the electron-builder `package.json` config block
+- The JS implementation of the backend (`src/models/`, `src/services/`, `src/repositories/`, `src/commands/`) - superseded by `src-tauri/`, which now has its own equivalent test coverage
+- The Electron-only Playwright E2E suite (`e2e/`, `playwright.config.js`) - no Tauri equivalent yet (see ROADMAP.md)
+
 ## [2.0.0] — Offline vault rewrite
 
 The original prototype (SQLite storage, bcrypt master password, Google Drive/Dropbox cloud backup, 2FA tracking) was replaced end to end with a fully offline, encrypted single-file vault. Nothing from the original backend survived the rewrite; the sections below cover the rewrite and everything built on top of it since.

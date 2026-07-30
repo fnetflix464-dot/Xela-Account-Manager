@@ -20,7 +20,7 @@ An offline, encrypted local vault for accounts, notes, cards, keys, and anything
 
 **Unlocking**
 - Master password is the only real encryption key
-- Optional PIN quick-unlock as a convenience layer on top of it — the PIN never derives the key itself; it unlocks a copy of the key wrapped by your OS's own credential store (DPAPI/Keychain/libsecret via Electron's `safeStorage`)
+- Optional PIN quick-unlock as a convenience layer on top of it — the PIN never derives the key itself; it unlocks a copy of the key wrapped by your OS's own credential store (DPAPI/Keychain/libsecret)
 
 **Customization**
 - Light/dark/system theme
@@ -34,12 +34,14 @@ An offline, encrypted local vault for accounts, notes, cards, keys, and anything
 
 ## Installation
 
+Requires the Rust toolchain in addition to Node — see [DEVELOPMENT.md](./DEVELOPMENT.md) for prerequisites (Linux needs a handful of system `-dev` packages for the WebView).
+
 ```bash
 npm install
 npm start
 ```
 
-`npm start` runs the CRA dev server and Electron together.
+`npm start` runs `tauri dev`, which starts the CRA dev server itself and launches the native window once it's ready.
 
 ## Testing
 
@@ -50,29 +52,23 @@ npm test
 ## Building
 
 ```bash
-npm run build   # publishes if a draft GitHub release exists
-npm run dist    # local package only, no publish
+npm run build   # react-scripts build + Tauri bundling (.deb/.rpm/AppImage on Linux, .msi/.exe on Windows, .dmg/.app on macOS)
 ```
-
-Packaging is handled by `electron-builder`; see `package.json`'s `build` field for the current target configuration.
 
 ## Project structure
 
 ```
 Xela-Account-Manager/
-├── public/
-│   ├── electron.js        # Main process: window, IPC handlers, event wiring (CommonJS)
-│   └── preload.cjs         # contextBridge — the only surface the renderer can call into
+├── src-tauri/               # Rust backend: window, commands (IPC), vault/crypto/settings/etc.
+│   ├── src/
+│   └── tauri.conf.json
 ├── src/
-│   ├── App.jsx              # Renderer root
-│   ├── components/          # React components (renderer)
-│   ├── hooks/                # React hooks (renderer)
-│   ├── utils/                 # Renderer-only helpers (theming, clipboard, password tools)
-│   ├── models/                # Vault/Entry/Folder/Settings — plain data + validation (ESM)
-│   ├── services/               # CryptoService, FileService, VaultService, etc. (ESM)
-│   ├── repositories/            # VaultRepository — the only layer that touches disk/crypto (ESM)
-│   ├── commands/                 # Undo/redo command objects (ESM)
-│   └── data/                      # entryTemplates.js, fieldTypes.js (ESM)
+│   ├── App.jsx                # Renderer root
+│   ├── tauriBridge.js          # window.api — the only surface the renderer calls into
+│   ├── components/              # React components (renderer)
+│   ├── hooks/                    # React hooks (renderer)
+│   ├── utils/                     # Renderer-only helpers (theming, clipboard, password tools)
+│   └── data/                       # entryTemplates.js, fieldTypes.js — shared UI metadata
 └── package.json
 ```
 
