@@ -22,8 +22,8 @@ class ErrorBoundary extends React.Component {
     });
 
     // Log to Electron if available
-    if (window.electron && window.electron.recordError) {
-      window.electron.recordError(error.toString(), errorInfo.componentStack);
+    if (window.api && window.api.recordError) {
+      window.api.recordError(error.toString(), errorInfo.componentStack);
     }
   }
 

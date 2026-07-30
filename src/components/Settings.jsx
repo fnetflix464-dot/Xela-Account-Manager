@@ -64,13 +64,13 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
     // here would clobber any unsaved live-previewed change with the
     // stale persisted value.
     if (!settingsProp) {
-      const settingsResult = await window.electron.getSettings();
+      const settingsResult = await window.api.getSettings();
       if (settingsResult.success) setSettings(settingsResult.data);
     }
     const [backupsResult, quickUnlockAvailableResult, quickUnlockEnabledResult] = await Promise.all([
-      window.electron.listBackups(),
-      window.electron.isQuickUnlockAvailable(),
-      window.electron.isQuickUnlockEnabled(),
+      window.api.listBackups(),
+      window.api.isQuickUnlockAvailable(),
+      window.api.isQuickUnlockEnabled(),
     ]);
     if (backupsResult.success) setBackups(backupsResult.data);
     if (quickUnlockAvailableResult.success) setQuickUnlockAvailable(quickUnlockAvailableResult.data.available);
@@ -138,7 +138,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
   };
 
   const handleSave = async () => {
-    const result = await window.electron.updateSettings(settings);
+    const result = await window.api.updateSettings(settings);
     if (result.success) {
       setSettings(result.data);
       onSettingsChanged(result.data);
@@ -156,7 +156,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
       setError('New passwords do not match');
       return;
     }
-    const result = await window.electron.changeMasterPassword(currentPassword, newPassword);
+    const result = await window.api.changeMasterPassword(currentPassword, newPassword);
     if (result.success) {
       setCurrentPassword('');
       setNewPassword('');
@@ -175,7 +175,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
       setError('PINs do not match');
       return;
     }
-    const result = await window.electron.enableQuickUnlock(newPin);
+    const result = await window.api.enableQuickUnlock(newPin);
     if (result.success) {
       setNewPin('');
       setConfirmNewPin('');
@@ -188,13 +188,13 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
   };
 
   const handleDisableQuickUnlock = async () => {
-    const result = await window.electron.disableQuickUnlock();
+    const result = await window.api.disableQuickUnlock();
     if (result.success) setQuickUnlockEnabled(false);
     else setError(result.error);
   };
 
   const handleExport = async () => {
-    const result = await window.electron.exportVault();
+    const result = await window.api.exportVault();
     if (!result.success) setError(result.error);
   };
 
@@ -207,7 +207,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
     if (!window.confirm('Importing will replace your current vault (a backup of it will be kept first). Continue?')) {
       return;
     }
-    const result = await window.electron.importVault(importPassword);
+    const result = await window.api.importVault(importPassword);
     if (result.success) {
       setImportPassword('');
       // eslint-disable-next-line no-alert
@@ -227,7 +227,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
     ) {
       return;
     }
-    const result = await window.electron.restoreBackup(backupPath);
+    const result = await window.api.restoreBackup(backupPath);
     if (result.success) {
       window.location.reload();
     } else {
@@ -238,7 +238,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
   const handleDeleteBackup = async (backupPath) => {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Delete this backup permanently? This cannot be undone.')) return;
-    const result = await window.electron.deleteBackup(backupPath);
+    const result = await window.api.deleteBackup(backupPath);
     if (result.success) {
       setBackups((prev) => prev.filter((p) => p !== backupPath));
     } else {
@@ -254,7 +254,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
 
   const handleConfirmRename = async () => {
     if (!renameValue.trim()) return;
-    const result = await window.electron.renameBackup(renamingPath, renameValue.trim());
+    const result = await window.api.renameBackup(renamingPath, renameValue.trim());
     if (result.success) {
       setBackups((prev) => prev.map((p) => (p === renamingPath ? result.data : p)));
       setRenamingPath(null);
@@ -265,7 +265,7 @@ function Settings({ settings: settingsProp, onSettingsChanged }) {
   };
 
   const handleExportBackup = async (backupPath) => {
-    const result = await window.electron.exportBackup(backupPath);
+    const result = await window.api.exportBackup(backupPath);
     if (!result.success) setError(result.error);
   };
 

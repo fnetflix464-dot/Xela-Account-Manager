@@ -18,7 +18,7 @@ function RecycleBin({ onChanged }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await window.electron.getRecycleBin();
+    const result = await window.api.getRecycleBin();
     if (result.success) setItems(result.data);
     else setError(result.error);
     setLoading(false);
@@ -29,7 +29,7 @@ function RecycleBin({ onChanged }) {
   }, [load]);
 
   const restore = async (recycleId) => {
-    const result = await window.electron.restoreFromRecycleBin(recycleId);
+    const result = await window.api.restoreFromRecycleBin(recycleId);
     if (result.success) {
       load();
       onChanged();
@@ -41,7 +41,7 @@ function RecycleBin({ onChanged }) {
   const permanentlyDelete = async (recycleId) => {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Permanently delete this item? This cannot be undone.')) return;
-    const result = await window.electron.permanentlyDelete(recycleId);
+    const result = await window.api.permanentlyDelete(recycleId);
     if (result.success) load();
     else setError(result.error);
   };
@@ -49,7 +49,7 @@ function RecycleBin({ onChanged }) {
   const emptyBin = async () => {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Permanently delete everything in the Recycle Bin? This cannot be undone.')) return;
-    const result = await window.electron.emptyRecycleBin();
+    const result = await window.api.emptyRecycleBin();
     if (result.success) load();
     else setError(result.error);
   };

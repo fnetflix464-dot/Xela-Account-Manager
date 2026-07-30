@@ -25,7 +25,7 @@ function Login({ onLoginSuccess }) {
   useEffect(() => {
     if (mode !== 'recovery') return;
     setBackupsLoading(true);
-    window.electron.listBackups().then((result) => {
+    window.api.listBackups().then((result) => {
       setBackups(result.success ? result.data : []);
       setBackupsLoading(false);
     });
@@ -37,18 +37,18 @@ function Login({ onLoginSuccess }) {
       // vault.xam should route straight to recovery instead of ever
       // reaching the normal unlock screen, where it could only ever
       // surface as a confusing "incorrect password" on every attempt.
-      const health = await window.electron.checkVaultHealth();
+      const health = await window.api.checkVaultHealth();
       if (health.success && !health.data.healthy) {
         setMode('recovery');
         setLoading(false);
         return;
       }
-      const result = await window.electron.checkMasterPasswordExists();
+      const result = await window.api.checkMasterPasswordExists();
       const exists = result.success && result.data.exists;
       setMode(exists ? 'verify' : 'setup');
 
       if (exists) {
-        const quickUnlock = await window.electron.isQuickUnlockEnabled();
+        const quickUnlock = await window.api.isQuickUnlockEnabled();
         const enabled = quickUnlock.success && quickUnlock.data.enabled;
         setQuickUnlockEnabled(enabled);
         setUsePin(enabled);
@@ -89,7 +89,7 @@ function Login({ onLoginSuccess }) {
 
     try {
       setLoading(true);
-      const result = await window.electron.setMasterPassword(password);
+      const result = await window.api.setMasterPassword(password);
 
       if (result.success) {
         onLoginSuccess();
@@ -114,7 +114,7 @@ function Login({ onLoginSuccess }) {
 
     try {
       setLoading(true);
-      const result = await window.electron.verifyMasterPassword(password);
+      const result = await window.api.verifyMasterPassword(password);
 
       if (result.success) {
         onLoginSuccess();
@@ -140,7 +140,7 @@ function Login({ onLoginSuccess }) {
 
     try {
       setLoading(true);
-      const result = await window.electron.unlockWithPin(pin);
+      const result = await window.api.unlockWithPin(pin);
       if (result.success) {
         onLoginSuccess();
       } else {
@@ -176,7 +176,7 @@ function Login({ onLoginSuccess }) {
       // Shows a native "choose file" dialog, then decrypts + adopts it as
       // the live vault - already unlocked in memory on success, so no
       // separate "unlock" step is needed afterwards.
-      const result = await window.electron.importVault(importPassword);
+      const result = await window.api.importVault(importPassword);
       if (result.success && result.data) {
         onLoginSuccess();
       } else if (result.success && !result.data) {
@@ -199,7 +199,7 @@ function Login({ onLoginSuccess }) {
     setError('');
     setRestoring(true);
     try {
-      const result = await window.electron.restoreBackup(backupPath);
+      const result = await window.api.restoreBackup(backupPath);
       if (result.success) {
         // Re-run the full health/existence check against the file that's
         // now live on disk rather than assuming the restored backup is

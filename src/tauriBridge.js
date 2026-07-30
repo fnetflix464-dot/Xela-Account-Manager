@@ -1,17 +1,11 @@
-// Installs window.electron when running under Tauri, shaped identically
-// to what public/preload.cjs's contextBridge exposed under Electron -
-// same method names, same argument order, same { success, data } /
-// { success, error } envelope on every call (preload.cjs just forwarded
-// ipcRenderer.invoke(), which resolved to whatever electron.js's handle()
-// wrapper produced; Tauri's invoke() instead resolves directly to the
-// command's return value or rejects with an error string, so this file
-// re-wraps every call to keep that envelope). Every existing component/
-// hook in src/ checks `result.success`/`result.data` - keeping that shape
-// here means none of those call sites need to change.
-//
-// Only installs itself under an actual Tauri runtime, and only if
-// window.electron isn't already set - so an Electron build (preload.cjs)
-// keeps working completely unchanged during the migration.
+// Installs window.api, the sole bridge between the React renderer and the
+// Rust backend (src-tauri/). Every method resolves to a { success, data }
+// or { success, error } envelope - Tauri's invoke() itself resolves
+// directly to a value or rejects with an error string, so this file
+// re-wraps every call into the envelope shape every component/hook in
+// src/ already checks via `result.success`/`result.data`. That shape was
+// originally electron.js's ipcMain.handle() convention, kept as-is here
+// rather than threading a different result shape through every call site.
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -25,7 +19,7 @@ async function call(command, args) {
 }
 
 function installBridge() {
-  window.electron = {
+  window.api = {
     // ---- window ----
     setWindowMode: (mode) => call('set_window_mode', { mode }),
 
@@ -115,6 +109,6 @@ function installBridge() {
   };
 }
 
-if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__ && !window.electron) {
+if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__ && !window.api) {
   installBridge();
 }

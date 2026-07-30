@@ -19,11 +19,11 @@ function ActivityLog() {
   const load = useCallback(async () => {
     setLoading(true);
     const [treeResult, favoritesResult, recycleResult, activityResult, reusedResult] = await Promise.all([
-      window.electron.getVaultTree(),
-      window.electron.listFavorites(),
-      window.electron.getRecycleBin(),
-      window.electron.listRecentActivity(25),
-      window.electron.findReusedPasswords(),
+      window.api.getVaultTree(),
+      window.api.listFavorites(),
+      window.api.getRecycleBin(),
+      window.api.listRecentActivity(25),
+      window.api.findReusedPasswords(),
     ]);
 
     if (treeResult.success) setTree(treeResult.data);

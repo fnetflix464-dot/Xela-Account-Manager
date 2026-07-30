@@ -15,7 +15,7 @@ export function useUndoRedo({ enabled, onChanged }) {
   const [canRedo, setCanRedo] = useState(false);
 
   const refreshState = useCallback(async () => {
-    const result = await window.electron.getUndoState();
+    const result = await window.api.getUndoState();
     if (result.success) {
       setCanUndo(result.data.canUndo);
       setCanRedo(result.data.canRedo);
@@ -31,7 +31,7 @@ export function useUndoRedo({ enabled, onChanged }) {
 
     refreshState();
 
-    const unsubscribe = window.electron.onVaultEvent((event) => {
+    const unsubscribe = window.api.onVaultEvent((event) => {
       if (event.action === 'command.stackChanged') {
         setCanUndo(event.details.canUndo);
         setCanRedo(event.details.canRedo);
@@ -41,14 +41,14 @@ export function useUndoRedo({ enabled, onChanged }) {
   }, [enabled, refreshState]);
 
   const undo = useCallback(async () => {
-    const result = await window.electron.undo();
+    const result = await window.api.undo();
     if (result.success && result.data) {
       onChanged();
     }
   }, [onChanged]);
 
   const redo = useCallback(async () => {
-    const result = await window.electron.redo();
+    const result = await window.api.redo();
     if (result.success && result.data) {
       onChanged();
     }

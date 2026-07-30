@@ -158,11 +158,11 @@ function App() {
   // The main window starts sized for the small Login card; grow it to
   // the full app size once authenticated, and shrink back on lock.
   useEffect(() => {
-    window.electron.setWindowMode(isAuthenticated ? 'app' : 'login');
+    window.api.setWindowMode(isAuthenticated ? 'app' : 'login');
   }, [isAuthenticated]);
 
   const loadTree = useCallback(async () => {
-    const result = await window.electron.getVaultTree();
+    const result = await window.api.getVaultTree();
     if (result.success) {
       setCategories(result.data);
       if (!selectedCategoryId && result.data.length > 0) {
@@ -174,12 +174,12 @@ function App() {
   }, [selectedCategoryId]);
 
   const loadSettings = useCallback(async () => {
-    const result = await window.electron.getSettings();
+    const result = await window.api.getSettings();
     if (result.success) setSettings(result.data);
   }, []);
 
   const loadRecentEntries = useCallback(async () => {
-    const result = await window.electron.listRecentEntries(10);
+    const result = await window.api.listRecentEntries(10);
     if (result.success) setRecentEntries(result.data);
   }, []);
 
@@ -193,7 +193,7 @@ function App() {
     loadSettings();
     loadRecentEntries();
 
-    const unsubscribe = window.electron.onVaultEvent((event) => {
+    const unsubscribe = window.api.onVaultEvent((event) => {
       if (event.action === 'vault.locked') {
         setIsAuthenticated(false);
         setCategories([]);
@@ -211,7 +211,7 @@ function App() {
       setSearchResults(null);
       return undefined;
     }
-    window.electron.searchVault(searchTerm).then((result) => {
+    window.api.searchVault(searchTerm).then((result) => {
       if (cancelled) return;
       if (result.success) {
         setSearchResults(result.data.filter((r) => r.type === 'entry').map((r) => r.item));
@@ -225,7 +225,7 @@ function App() {
   const handleLoginSuccess = () => setIsAuthenticated(true);
 
   const handleLock = async () => {
-    await window.electron.lockVault();
+    await window.api.lockVault();
     setIsAuthenticated(false);
     setCategories([]);
     setEditingEntry(null);
@@ -260,7 +260,7 @@ function App() {
       onSubmit: async (name) => {
         setPromptModal(null);
         setLoading(true);
-        const result = await window.electron.addCategory(name, 'category');
+        const result = await window.api.addCategory(name, 'category');
         setLoading(false);
         if (result.success) loadTree();
         else setError(result.error);
@@ -276,7 +276,7 @@ function App() {
       onSubmit: async (name) => {
         setPromptModal(null);
         setLoading(true);
-        const result = await window.electron.renameCategory(categoryId, name);
+        const result = await window.api.renameCategory(categoryId, name);
         setLoading(false);
         if (result.success) loadTree();
         else setError(result.error);
@@ -288,7 +288,7 @@ function App() {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Delete this category and everything in it? It will move to the Recycle Bin.')) return;
     setLoading(true);
-    const result = await window.electron.deleteCategory(categoryId);
+    const result = await window.api.deleteCategory(categoryId);
     setLoading(false);
     if (result.success) {
       if (selectedCategoryId === categoryId) {
@@ -306,7 +306,7 @@ function App() {
       onSubmit: async (name) => {
         setPromptModal(null);
         setLoading(true);
-        const result = await window.electron.addFolder(categoryId, parentFolderId, name);
+        const result = await window.api.addFolder(categoryId, parentFolderId, name);
         setLoading(false);
         if (result.success) loadTree();
         else setError(result.error);
@@ -322,7 +322,7 @@ function App() {
       onSubmit: async (name) => {
         setPromptModal(null);
         setLoading(true);
-        const result = await window.electron.renameFolder(categoryId, folderId, name);
+        const result = await window.api.renameFolder(categoryId, folderId, name);
         setLoading(false);
         if (result.success) loadTree();
         else setError(result.error);
@@ -334,7 +334,7 @@ function App() {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Delete this folder and everything in it? It will move to the Recycle Bin.')) return;
     setLoading(true);
-    const result = await window.electron.deleteFolder(categoryId, folderId);
+    const result = await window.api.deleteFolder(categoryId, folderId);
     setLoading(false);
     if (result.success) {
       if (selectedFolderId === folderId) setSelectedFolderId(null);
@@ -343,7 +343,7 @@ function App() {
   };
 
   const handleMoveFolder = async (folderId, targetCategoryId, targetParentFolderId, beforeFolderId) => {
-    const result = await window.electron.moveFolder(folderId, targetCategoryId, targetParentFolderId, beforeFolderId);
+    const result = await window.api.moveFolder(folderId, targetCategoryId, targetParentFolderId, beforeFolderId);
     if (result.success) loadTree();
     else setError(result.error);
   };
@@ -364,7 +364,7 @@ function App() {
       return;
     }
     setLoading(true);
-    const result = await window.electron.addEntry(selectedCategoryId, selectedFolderId, { title, template });
+    const result = await window.api.addEntry(selectedCategoryId, selectedFolderId, { title, template });
     setLoading(false);
     setShowNewEntryModal(false);
     if (result.success) {
@@ -378,7 +378,7 @@ function App() {
 
   const handleSaveEntry = async (updates) => {
     setLoading(true);
-    const result = await window.electron.updateEntry(editingEntry.id, updates);
+    const result = await window.api.updateEntry(editingEntry.id, updates);
     setLoading(false);
     if (result.success) {
       setEditingEntry(null);
@@ -392,7 +392,7 @@ function App() {
   const handleDeleteEntry = async (entryId) => {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Delete this entry? It will move to the Recycle Bin.')) return;
-    const result = await window.electron.deleteEntry(entryId);
+    const result = await window.api.deleteEntry(entryId);
     if (result.success) {
       loadTree();
       loadRecentEntries();
@@ -400,7 +400,7 @@ function App() {
   };
 
   const handleDuplicateEntry = async (entryId) => {
-    const result = await window.electron.duplicateEntry(entryId);
+    const result = await window.api.duplicateEntry(entryId);
     if (result.success) {
       loadTree();
       loadRecentEntries();
@@ -408,7 +408,7 @@ function App() {
   };
 
   const handleToggleFavorite = async (entryId) => {
-    const result = await window.electron.toggleFavorite(entryId);
+    const result = await window.api.toggleFavorite(entryId);
     if (result.success) {
       loadTree();
       loadRecentEntries();
