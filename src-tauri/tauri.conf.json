@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Xela Account Manager",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "identifier": "com.xela.accountmanager",
   "build": {
     "frontendDist": "../build",
@@ -11,9 +11,13 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Xela Account Manager",
-        "width": 800,
-        "height": 600,
+        "width": 520,
+        "height": 700,
+        "minWidth": 460,
+        "minHeight": 600,
+        "center": true,
         "resizable": true,
         "fullscreen": false
       }

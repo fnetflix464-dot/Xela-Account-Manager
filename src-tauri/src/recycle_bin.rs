@@ -37,10 +37,6 @@ pub fn remove_record(vault: &Vault, recycle_id: &str) -> Vault {
     next
 }
 
-pub fn list(vault: &Vault) -> &[RecycleBinRecord] {
-    &vault.recycle_bin
-}
-
 pub fn clear(vault: &Vault) -> Vault {
     let mut next = vault.clone();
     next.recycle_bin.clear();

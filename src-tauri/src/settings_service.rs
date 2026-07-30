@@ -95,10 +95,6 @@ pub fn validate(settings: &Settings) -> Result<(), SettingsError> {
     Ok(())
 }
 
-pub fn create_default() -> Settings {
-    Settings::default()
-}
-
 /// Merges `updates` into `current` and validates the result before
 /// returning it. Errors (without mutating anything) if the merged result
 /// would be invalid.

@@ -18,3 +18,5 @@ out/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+src-tauri/target/
+src-tauri/gen/
