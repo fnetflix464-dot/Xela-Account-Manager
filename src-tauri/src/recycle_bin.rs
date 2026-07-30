@@ -68,8 +68,8 @@ mod tests {
         let vault = create_vault();
         let category = create_category(CreateCategoryOptions { name: "X".into(), ..Default::default() }).unwrap();
         let vault = add_record(&vault, build_category_record(category));
-        assert_eq!(list(&vault).len(), 1);
+        assert_eq!(vault.recycle_bin.len(), 1);
         let vault = clear(&vault);
-        assert!(list(&vault).is_empty());
+        assert!(vault.recycle_bin.is_empty());
     }
 }
