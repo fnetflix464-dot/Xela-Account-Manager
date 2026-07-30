@@ -11,10 +11,13 @@ Electron replaced with a Tauri v2 (Rust) backend, for a fraction of the shipped 
 - 120 Rust unit tests, including a round-trip check against a vault file written by the retired Electron/Node implementation to confirm byte-compatibility
 - `src/tauriBridge.js` installs `window.api`, replacing `window.electron`; every command result keeps the same `{success,data}`/`{success,error}` envelope so renderer code didn't need to change shape, just the one property name it reads off `window`
 
+### Testing
+- `e2e-tauri/run.mjs` replaces the Electron-only Playwright E2E suite: drives the real compiled binary via `tauri-driver` (W3C WebDriver) + `webdriverio`, covering the same field-editor-overlap regression the old suite checked (`npm run test:e2e`)
+
 ### Removed
 - Electron, `electron-builder`, `electron-is-dev` and the electron-builder `package.json` config block
 - The JS implementation of the backend (`src/models/`, `src/services/`, `src/repositories/`, `src/commands/`) - superseded by `src-tauri/`, which now has its own equivalent test coverage
-- The Electron-only Playwright E2E suite (`e2e/`, `playwright.config.js`) - no Tauri equivalent yet (see ROADMAP.md)
+- The Electron-only Playwright E2E suite (`e2e/`, `playwright.config.js`) - superseded by `e2e-tauri/`
 
 ## [2.0.0] — Offline vault rewrite
 

@@ -5,6 +5,7 @@
 - Rust toolchain (`rustup`) and the platform's Tauri prerequisites:
   - **Linux**: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `libxss-dev` (idle-detection needs the X11 screensaver extension headers), `patchelf`
   - **Windows/macOS**: see https://tauri.app/start/prerequisites/
+- Optional, only for `npm run test:e2e`: `tauri-driver` (`cargo install tauri-driver --locked`) and, on Linux, the `webkit2gtk-driver` system package
 
 ## Setup
 ```bash
@@ -31,6 +32,12 @@ cd src-tauri && cargo test
 ```
 
 The Rust backend's own suite - crypto, vault repository/service, command manager, quick-unlock, idle-lock, activity log, recycle bin, search, settings, backups.
+
+```bash
+npm run test:e2e
+```
+
+Drives the real compiled binary via `tauri-driver` (W3C WebDriver) + `webdriverio` (`e2e-tauri/run.mjs`) - currently covers one scenario end to end (vault creation → category → folder → entry → field, then a layout regression check). Requires `tauri-driver` on `PATH` (`cargo install tauri-driver --locked`) and, on Linux, the `webkit2gtk-driver` system package.
 
 ## Building
 ```bash
@@ -69,7 +76,7 @@ src/
 
 ## Manual smoke test checklist
 
-There's automated coverage for the Rust backend and a handful of renderer units, but no end-to-end UI test suite currently wired up (see ROADMAP.md) — after a UI change, walk through:
+There's automated coverage for the Rust backend, a handful of renderer units, and one E2E scenario (`npm run test:e2e`, see ROADMAP.md for what it does and doesn't cover) — after a UI change, walk through the rest by hand:
 
 1. First launch → set master password → vault unlocks
 2. Lock → unlock with master password
