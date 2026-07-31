@@ -4,6 +4,7 @@ import { calculatePasswordStrength } from '../utils/passwordStrength';
 import WindowControls from './WindowControls';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { LogicalSize } from '@tauri-apps/api/dpi';
+import { startWindowDrag } from '../utils/windowDrag';
 
 const appWindow = getCurrentWindow();
 const LOGIN_WINDOW_WIDTH = 420;
@@ -15,7 +16,16 @@ function Login({ onLoginSuccess }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [importPassword, setImportPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  // initializing is ONLY for the one-time checkVaultStatus() call on
+  // mount, which is what actually needs the standalone full-screen
+  // spinner (no mode/form determined yet to render anything else).
+  // loading is reused by every submit handler (verify/setup/PIN/import)
+  // to disable the form's own button and show "Processing..." on it -
+  // it must NOT also trigger the full-screen spinner, or every submit
+  // would replace the form the user is looking at with a bare spinner
+  // for the duration of the call before jumping to the next screen.
+  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState('');
   const [backups, setBackups] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
@@ -25,6 +35,34 @@ function Login({ onLoginSuccess }) {
   const [pin, setPin] = useState('');
   const loginBoxRef = useRef(null);
   const lastFitHeightRef = useRef(null);
+  const isPointerDownRef = useRef(false);
+  const pendingFitRef = useRef(false);
+  const fitWindowToContentRef = useRef(() => {});
+
+  // Tracked in the CAPTURE phase specifically so this always sees a real
+  // mousedown regardless of what happens afterward - Tauri's own
+  // drag-region handler (bubble phase, on document) calls
+  // stopImmediatePropagation() once it recognizes a drag, which would
+  // otherwise silently prevent a same-phase/bubble listener registered
+  // after it (i.e. anything added once React mounts) from ever firing.
+  useEffect(() => {
+    const onDown = () => {
+      isPointerDownRef.current = true;
+    };
+    const onUp = () => {
+      isPointerDownRef.current = false;
+      if (pendingFitRef.current) {
+        pendingFitRef.current = false;
+        fitWindowToContentRef.current();
+      }
+    };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('mouseup', onUp, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('mouseup', onUp, true);
+    };
+  }, []);
 
   // Keeps the (decorations:false) window sized to whatever login panel is
   // actually showing - scrollHeight reflects the box's true content height
@@ -34,11 +72,21 @@ function Login({ onLoginSuccess }) {
   // first paint the user ever sees is already correctly sized - show()
   // is a no-op once the window is already visible, so calling it on every
   // fit is harmless and avoids needing separate "first reveal" state.
+  //
+  // Guarded against firing while the mouse button is held down: an
+  // in-progress window drag (startWindowDrag on .login-header, see
+  // ../utils/windowDrag.js) must never race against this calling
+  // setSize()/center(), which would reposition the window out from
+  // under the user's drag and make it look like dragging doesn't work.
   useLayoutEffect(() => {
     const el = loginBoxRef.current;
     if (!el) return undefined;
 
     const fitWindowToContent = () => {
+      if (isPointerDownRef.current) {
+        pendingFitRef.current = true;
+        return;
+      }
       const height = Math.round(el.scrollHeight);
       if (lastFitHeightRef.current === height) {
         appWindow.show();
@@ -50,6 +98,7 @@ function Login({ onLoginSuccess }) {
         .then(() => appWindow.center())
         .then(() => appWindow.show());
     };
+    fitWindowToContentRef.current = fitWindowToContent;
 
     fitWindowToContent();
     const observer = new ResizeObserver(fitWindowToContent);
@@ -79,7 +128,7 @@ function Login({ onLoginSuccess }) {
       const health = await window.api.checkVaultHealth();
       if (health.success && !health.data.healthy) {
         setMode('recovery');
-        setLoading(false);
+        setInitializing(false);
         return;
       }
       const result = await window.api.checkMasterPasswordExists();
@@ -92,10 +141,10 @@ function Login({ onLoginSuccess }) {
         setQuickUnlockEnabled(enabled);
         setUsePin(enabled);
       }
-      setLoading(false);
+      setInitializing(false);
     } catch (err) {
       setError('Error checking authentication status');
-      setLoading(false);
+      setInitializing(false);
     }
   };
 
@@ -270,12 +319,12 @@ function Login({ onLoginSuccess }) {
     }
   };
 
-  if (loading) {
+  if (initializing) {
     return (
       <div className="login-container">
-        <div className="login-box">
+        <div className="login-box" onMouseDown={startWindowDrag}>
           <WindowControls />
-          <div data-tauri-drag-region="deep">
+          <div>
             <div className="spinner"></div>
             <p>Loading...</p>
           </div>
@@ -287,9 +336,9 @@ function Login({ onLoginSuccess }) {
   if (mode === 'recovery') {
     return (
       <div className="login-container">
-        <div className="login-box" ref={loginBoxRef}>
+        <div className="login-box" ref={loginBoxRef} onMouseDown={startWindowDrag}>
           <WindowControls />
-          <div className="login-header" data-tauri-drag-region="deep">
+          <div className="login-header">
             <h1 className="app-wordmark login-wordmark">
               <span className="app-wordmark-main">XELA</span>
               <span className="app-wordmark-sub">Account Manager</span>
@@ -347,9 +396,9 @@ function Login({ onLoginSuccess }) {
   if (mode === 'verify' && usePin) {
     return (
       <div className="login-container">
-        <div className="login-box" ref={loginBoxRef}>
+        <div className="login-box" ref={loginBoxRef} onMouseDown={startWindowDrag}>
           <WindowControls />
-          <div className="login-header" data-tauri-drag-region="deep">
+          <div className="login-header">
             <h1 className="app-wordmark login-wordmark">
               <span className="app-wordmark-main">XELA</span>
               <span className="app-wordmark-sub">Account Manager</span>
@@ -403,9 +452,9 @@ function Login({ onLoginSuccess }) {
   if (mode === 'import') {
     return (
       <div className="login-container">
-        <div className="login-box" ref={loginBoxRef}>
+        <div className="login-box" ref={loginBoxRef} onMouseDown={startWindowDrag}>
           <WindowControls />
-          <div className="login-header" data-tauri-drag-region="deep">
+          <div className="login-header">
             <h1 className="app-wordmark login-wordmark">
               <span className="app-wordmark-main">XELA</span>
               <span className="app-wordmark-sub">Account Manager</span>
@@ -461,9 +510,9 @@ function Login({ onLoginSuccess }) {
 
   return (
     <div className="login-container">
-      <div className="login-box" ref={loginBoxRef}>
+      <div className="login-box" ref={loginBoxRef} onMouseDown={startWindowDrag}>
         <WindowControls />
-        <div className="login-header" data-tauri-drag-region="deep">
+        <div className="login-header">
           <h1 className="app-wordmark login-wordmark">
             <span className="app-wordmark-main">XELA</span>
             <span className="app-wordmark-sub">Account Manager</span>

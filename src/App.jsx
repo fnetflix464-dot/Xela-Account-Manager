@@ -13,6 +13,10 @@ import { findCategory, findFolder, findParentFolderId } from './utils/vaultTree'
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { applyTheme, applyAccentColor, applyBackgroundColor, applySurfaceStyling } from './utils/theme';
 import { entryTemplates } from './data/entryTemplates.js';
+import { startWindowDrag } from './utils/windowDrag';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+
+const appWindow = getCurrentWindow();
 
 const ENTRY_TEMPLATES = entryTemplates.map((t) => t.name);
 
@@ -162,10 +166,20 @@ function App() {
   // (both on first mount and after Lock), and racing it against this
   // coarse Rust-side preset caused the window to snap back to the wrong
   // size depending on which async resize call happened to resolve last.
+  //
+  // Hidden for the duration of the resize itself, same reasoning as
+  // handleLock's await appWindow.hide(): setWindowMode('app') visibly
+  // resizes/recenters a still-visible window otherwise, so unlocking
+  // showed a jarring jump from the small login size to the full
+  // 1280x840 app size instead of the dashboard just appearing already
+  // correctly sized.
   useEffect(() => {
-    if (isAuthenticated) {
-      window.api.setWindowMode('app');
-    }
+    if (!isAuthenticated) return;
+    (async () => {
+      await appWindow.hide();
+      await window.api.setWindowMode('app');
+      await appWindow.show();
+    })();
   }, [isAuthenticated]);
 
   const loadTree = useCallback(async () => {
@@ -232,6 +246,20 @@ function App() {
   const handleLoginSuccess = () => setIsAuthenticated(true);
 
   const handleLock = async () => {
+    // Awaited, and done BEFORE anything that could re-render into the
+    // "Loading..." check-vault-status screen (both this function's own
+    // setIsAuthenticated(false) below and lockVault() itself, which
+    // triggers a 'vault.locked' vault-event that a separate listener
+    // also reacts to by setting isAuthenticated false) - hide() is an
+    // async cross-process IPC call while React's own state-driven
+    // re-render happens synchronously and much faster in-process, so a
+    // fire-and-forget hide() here would lose that race: the window would
+    // still be visibly showing "Loading..." for a moment before actually
+    // disappearing. Awaiting first removes the race instead of just
+    // shrinking it. Login.jsx's own mount effect (the same one used for
+    // the very first cold launch) re-shows the window once the real
+    // login panel is sized and ready.
+    await appWindow.hide();
     await window.api.lockVault();
     setIsAuthenticated(false);
     setCategories([]);
@@ -459,7 +487,7 @@ function App() {
       }
     >
       <header className="app-header">
-        <div className="app-header-top" data-tauri-drag-region="deep">
+        <div className="app-header-top" onMouseDown={startWindowDrag}>
           <h1 className="app-wordmark">
             <span className="app-wordmark-main">XELA</span>
             <span className="app-wordmark-sub">Account Manager</span>
